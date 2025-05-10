@@ -7,9 +7,9 @@ import {
   Snackbar,
   Alert,
 } from "@mui/material";
-import { LoadingButton } from '@mui/lab';
+import { LoadingButton } from "@mui/lab";
 import { db } from "../firebase/config";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useState } from "react";
 
 interface FormData {
@@ -38,7 +38,10 @@ export default function Register() {
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     setLoading(true);
     try {
-      await addDoc(collection(db, "students"), data);
+      await addDoc(collection(db, "students"), {
+        ...data,
+        createdAt: serverTimestamp(), // ← 🚀 agrega fecha del servidor
+      });
       setSnackbarMessage("¡Registro guardado exitosamente!");
       setSnackbarSeverity("success");
       setOpenSnackbar(true);
