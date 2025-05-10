@@ -1,4 +1,15 @@
-import { useForm, SubmitHandler } from "react-hook-form";
+import { useState } from 'react';
+import { useForm, SubmitHandler } from 'react-hook-form';
+import { useRouter } from 'next/router';
+import {
+  collection,
+  addDoc,
+  query,
+  where,
+  getDocs,
+  serverTimestamp,
+} from 'firebase/firestore';
+import { db } from '../firebase/config';
 import {
   Container,
   TextField,
@@ -6,11 +17,8 @@ import {
   Box,
   Snackbar,
   Alert,
-} from "@mui/material";
+} from '@mui/material';
 import { LoadingButton } from "@mui/lab";
-import { db } from "../firebase/config";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { useState } from "react";
 
 interface FormData {
   nombre: string;
@@ -27,29 +35,45 @@ export default function Register() {
     reset,
     formState: { errors },
   } = useForm<FormData>();
+  const router = useRouter();
 
-  const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState("");
-  const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error">(
-    "success"
-  );
   const [loading, setLoading] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] =
+    useState<'success' | 'error'>('success');
+  const [openSnackbar, setOpenSnackbar] = useState(false);
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     setLoading(true);
     try {
-      await addDoc(collection(db, "students"), {
-        ...data,
-        createdAt: serverTimestamp(), // ← 🚀 agrega fecha del servidor
-      });
-      setSnackbarMessage("¡Registro guardado exitosamente!");
-      setSnackbarSeverity("success");
-      setOpenSnackbar(true);
+      const q = query(
+        collection(db, 'students'),
+        where('codigo', '==', data.codigo)
+      );
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        localStorage.setItem('studentCode', data.codigo);
+        setSnackbarMessage('Código ya registrado. Redirigiendo...');
+        setSnackbarSeverity('success');
+        setOpenSnackbar(true);
+        router.push('/');
+      } else {
+        await addDoc(collection(db, 'students'), {
+          ...data,
+          createdAt: serverTimestamp(),
+        });
+
+        localStorage.setItem('studentCode', data.codigo);
+        setSnackbarMessage('¡Registro exitoso!');
+        setSnackbarSeverity('success');
+        setOpenSnackbar(true);
+      }
       reset();
     } catch (error) {
-      console.error("Error adding document: ", error);
-      setSnackbarMessage("Ocurrió un error al guardar. Intenta de nuevo.");
-      setSnackbarSeverity("error");
+      console.error('Error adding document: ', error);
+      setSnackbarMessage('Ocurrió un error al guardar. Intenta de nuevo.');
+      setSnackbarSeverity('error');
       setOpenSnackbar(true);
     } finally {
       setLoading(false);
@@ -61,17 +85,12 @@ export default function Register() {
       <Typography variant="h4" align="center" gutterBottom>
         Registro de Estudiante
       </Typography>
-      <Box
-        component="form"
-        onSubmit={handleSubmit(onSubmit)}
-        noValidate
-        sx={{ mt: 2 }}
-      >
+      <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate sx={{ mt: 2 }}>
         <TextField
           fullWidth
           label="Nombre"
           margin="normal"
-          {...register("nombre", { required: "El nombre es obligatorio" })}
+          {...register('nombre', { required: 'El nombre es obligatorio' })}
           error={!!errors.nombre}
           helperText={errors.nombre?.message}
         />
@@ -80,9 +99,7 @@ export default function Register() {
           fullWidth
           label="Documento de Identidad"
           margin="normal"
-          {...register("documento", {
-            required: "El documento es obligatorio",
-          })}
+          {...register('documento', { required: 'El documento es obligatorio' })}
           error={!!errors.documento}
           helperText={errors.documento?.message}
         />
@@ -92,11 +109,11 @@ export default function Register() {
           label="Correo Electrónico"
           margin="normal"
           type="email"
-          {...register("correo", {
-            required: "El correo es obligatorio",
+          {...register('correo', {
+            required: 'El correo es obligatorio',
             pattern: {
               value: /^\S+@\S+$/i,
-              message: "Correo no válido",
+              message: 'Correo no válido',
             },
           })}
           error={!!errors.correo}
@@ -107,7 +124,7 @@ export default function Register() {
           fullWidth
           label="Código de Estudiante"
           margin="normal"
-          {...register("codigo", { required: "El código es obligatorio" })}
+          {...register('codigo', { required: 'El código es obligatorio' })}
           error={!!errors.codigo}
           helperText={errors.codigo?.message}
         />
@@ -116,7 +133,7 @@ export default function Register() {
           fullWidth
           label="Programa Académico"
           margin="normal"
-          {...register("programa", { required: "El programa es obligatorio" })}
+          {...register('programa', { required: 'El programa es obligatorio' })}
           error={!!errors.programa}
           helperText={errors.programa?.message}
         />
@@ -134,14 +151,14 @@ export default function Register() {
 
       <Snackbar
         open={openSnackbar}
-        autoHideDuration={4000}
+        autoHideDuration={3000}
         onClose={() => setOpenSnackbar(false)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <Alert
           onClose={() => setOpenSnackbar(false)}
           severity={snackbarSeverity}
-          sx={{ width: "100%" }}
+          sx={{ width: '100%' }}
         >
           {snackbarMessage}
         </Alert>
