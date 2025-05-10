@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useForm, SubmitHandler } from 'react-hook-form';
+import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { useRouter } from 'next/router';
 import {
   collection,
@@ -17,8 +17,13 @@ import {
   Box,
   Snackbar,
   Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
-import { LoadingButton } from "@mui/lab";
+import { LoadingButton } from '@mui/lab';
+import programas from '../data/programas';
 
 interface FormData {
   nombre: string;
@@ -33,6 +38,7 @@ export default function Register() {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm<FormData>();
   const router = useRouter();
@@ -129,14 +135,33 @@ export default function Register() {
           helperText={errors.codigo?.message}
         />
 
-        <TextField
-          fullWidth
-          label="Programa Académico"
-          margin="normal"
-          {...register('programa', { required: 'El programa es obligatorio' })}
-          error={!!errors.programa}
-          helperText={errors.programa?.message}
-        />
+        <FormControl fullWidth margin="normal" error={!!errors.programa}>
+          <InputLabel id="programa-label">Programa Académico</InputLabel>
+          <Controller
+            name="programa"
+            control={control}
+            defaultValue=""
+            rules={{ required: 'El programa es obligatorio' }}
+            render={({ field }) => (
+              <Select
+                {...field}
+                labelId="programa-label"
+                label="Programa Académico"
+              >
+                {programas.map((programa) => (
+                  <MenuItem key={programa} value={programa}>
+                    {programa}
+                  </MenuItem>
+                ))}
+              </Select>
+            )}
+          />
+          {errors.programa && (
+            <Typography variant="caption" color="error">
+              {errors.programa.message}
+            </Typography>
+          )}
+        </FormControl>
 
         <LoadingButton
           type="submit"
