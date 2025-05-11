@@ -27,11 +27,13 @@ export default function Home() {
       if (!querySnapshot.empty) {
         const studentDoc = querySnapshot.docs[0].data();
         const programa = studentDoc.programa;
+        const studentName = studentDoc.nombre;
 
         // Guardar en history
         await addDoc(collection(db, "history"), {
           codigo: studentCode,
           programa: programa,
+          nombre: studentName,
           fechaAcceso: serverTimestamp(),
         });
 
