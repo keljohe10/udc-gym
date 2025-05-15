@@ -22,8 +22,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../firebase/config";
-
-const sedes = ["Sede Norte", "Sede Centro", "Sede Sur"];
+import branches from "../data/branch";
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
@@ -101,9 +100,9 @@ export default function Home() {
                   label="Sede"
                   onChange={(e) => setBranch(e.target.value)}
                 >
-                  {sedes.map((sede) => (
-                    <MenuItem key={sede} value={sede}>
-                      {sede}
+                  {branches.map((branch: string) => (
+                    <MenuItem key={branch} value={branch}>
+                      {branch}
                     </MenuItem>
                   ))}
                 </Select>
