@@ -39,10 +39,9 @@ export default function Register() {
     handleSubmit,
     reset,
     control,
-    formState: { errors },
+    formState: { errors, isValid },
     setError,
     clearErrors,
-    trigger,
   } = useForm<FormData>();
   const router = useRouter();
 
@@ -184,6 +183,7 @@ export default function Register() {
           variant="contained"
           sx={{ mt: 3 }}
           loading={loading}
+          disabled={!isValid || loading}
         >
           Registrar
         </LoadingButton>
