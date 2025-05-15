@@ -1,4 +1,4 @@
-const programas = [
+const program = [
   "Administración de Empresas (Diurna y Nocturna)",
   "Administración Industrial",
   "Contaduría Pública (Diurna y Nocturna)",
@@ -24,6 +24,6 @@ const programas = [
   "Profesional Universitario en Lenguas Extranjeras"
 ];
 
-export default programas;
+export default program;
 
 

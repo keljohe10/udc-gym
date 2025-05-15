@@ -21,64 +21,85 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Stepper,
+  Step,
+  StepLabel,
+  Button,
 } from '@mui/material';
 import { LoadingButton } from '@mui/lab';
-import programas from '../data/programas';
+import programs from '../data/program';
 
 interface FormData {
-  nombre: string;
-  documento: string;
-  correo: string;
-  codigo: string;
-  programa: string;
+  name: string;
+  id: string;
+  email: string;
+  userType: 'docente' | 'estudiante';
+  department?: string;
+  studentCode?: string;
+  program?: string;
 }
 
-export default function Register() {
+const steps = ['Información Básica', 'Tipo de Usuario', 'Información Adicional'];
+
+export default function RegisterStepper() {
   const {
     register,
     handleSubmit,
-    reset,
     control,
     formState: { errors, isValid },
     setError,
-    clearErrors,
-  } = useForm<FormData>();
+    watch,
+    trigger,
+  } = useForm<FormData>({ mode: 'onChange' });
   const router = useRouter();
-
+  const userType = watch('userType');
+  const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
   const [openSnackbar, setOpenSnackbar] = useState(false);
 
-  const validateCodigo = async (codigo: string) => {
-    const q = query(collection(db, 'students'), where('codigo', '==', codigo));
+  const validateStudentCode = async (studentCode: string) => {
+    const q = query(collection(db, 'users'), where('studentCode', '==', studentCode));
+    const snapshot = await getDocs(q);
+    return snapshot.empty;
+  };
+
+  const validateId = async (id: string) => {
+    const q = query(collection(db, 'users'), where('id', '==', id));
     const snapshot = await getDocs(q);
     return snapshot.empty;
   };
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     setLoading(true);
-    const isValid = await validateCodigo(data.codigo);
-
-    if (!isValid) {
-      setError('codigo', { type: 'manual', message: 'Este código ya está registrado' });
+    const idIsValid = await validateId(data.id);
+    if (!idIsValid) {
+      setError('id', { type: 'manual', message: 'Este documento ya está registrado' });
       setLoading(false);
       return;
     }
+    if (data.userType === 'estudiante') {
+      const codeIsValid = await validateStudentCode(data.studentCode!);
+      if (!codeIsValid) {
+        setError('studentCode', { type: 'manual', message: 'Este código ya está registrado' });
+        setLoading(false);
+        return;
+      }
+    }
 
     try {
-      await addDoc(collection(db, 'students'), {
+      await addDoc(collection(db, 'users'), {
         ...data,
         createdAt: serverTimestamp(),
       });
-
-      localStorage.setItem('studentCode', data.codigo);
+      localStorage.setItem('id', data.id);
       setSnackbarMessage('¡Registro exitoso!');
       setSnackbarSeverity('success');
       setOpenSnackbar(true);
-      reset();
+      router.push('/success');
     } catch (error) {
-      console.error('Error adding document: ', error);
+      console.error('Error adding document:', error);
       setSnackbarMessage('Ocurrió un error al guardar. Intenta de nuevo.');
       setSnackbarSeverity('error');
       setOpenSnackbar(true);
@@ -87,107 +108,167 @@ export default function Register() {
     }
   };
 
-  const handleCodigoBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (value) {
-      const isValid = await validateCodigo(value);
-      if (!isValid) {
-        setError('codigo', { type: 'manual', message: 'Este código ya está registrado' });
-      } else {
-        clearErrors('codigo');
+  const handleNext = async () => {
+    if (activeStep === 0) {
+      const isStepValid = await trigger(['name', 'id', 'email']);
+      if (!isStepValid) return;
+      const idValue = watch('id');
+      if (idValue) {
+        const idIsValid = await validateId(idValue);
+        if (!idIsValid) {
+          setError('id', { type: 'manual', message: 'Este documento ya está registrado' });
+          return;
+        }
+      }
+      setActiveStep((prev) => prev + 1);
+    } else {
+      const isStepValid = await trigger();
+      if (isStepValid) {
+        setActiveStep((prev) => prev + 1);
       }
     }
+  };
+
+  const handleBack = () => {
+    setActiveStep((prev) => prev - 1);
   };
 
   return (
     <Container maxWidth="sm" sx={{ mt: 5 }}>
       <Typography variant="h4" align="center" gutterBottom>
-        Registro de Estudiante
+        Registro de Usuario - UDC Gym
       </Typography>
-      <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate sx={{ mt: 2 }}>
-        <TextField
-          fullWidth
-          label="Nombre"
-          margin="normal"
-          {...register('nombre', { required: 'El nombre es obligatorio' })}
-          error={!!errors.nombre}
-          helperText={errors.nombre?.message}
-        />
+      <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
+        {steps.map((label) => (
+          <Step key={label}>
+            <StepLabel>{label}</StepLabel>
+          </Step>
+        ))}
+      </Stepper>
+      <form onSubmit={handleSubmit(onSubmit)} noValidate>
+        {activeStep === 0 && (
+          <Box>
+            <TextField
+              fullWidth
+              label="Nombre"
+              margin="normal"
+              {...register('name', { required: 'El nombre es obligatorio' })}
+              error={!!errors.name}
+              helperText={errors.name?.message}
+            />
+            <TextField
+              fullWidth
+              label="Documento de Identidad"
+              margin="normal"
+              {...register('id', { required: 'El documento es obligatorio' })}
+              error={!!errors.id}
+              helperText={errors.id?.message}
+            />
+            <TextField
+              fullWidth
+              label="Correo Electrónico"
+              margin="normal"
+              type="email"
+              {...register('email', {
+                required: 'El correo es obligatorio',
+                pattern: {
+                  value: /^\S+@\S+$/i,
+                  message: 'Correo no válido',
+                },
+              })}
+              error={!!errors.email}
+              helperText={errors.email?.message}
+            />
+          </Box>
+        )}
 
-        <TextField
-          fullWidth
-          label="Documento de Identidad"
-          margin="normal"
-          {...register('documento', { required: 'El documento es obligatorio' })}
-          error={!!errors.documento}
-          helperText={errors.documento?.message}
-        />
-
-        <TextField
-          fullWidth
-          label="Correo Electrónico"
-          margin="normal"
-          type="email"
-          {...register('correo', {
-            required: 'El correo es obligatorio',
-            pattern: {
-              value: /^\S+@\S+$/i,
-              message: 'Correo no válido',
-            },
-          })}
-          error={!!errors.correo}
-          helperText={errors.correo?.message}
-        />
-
-        <TextField
-          fullWidth
-          label="Código de Estudiante"
-          margin="normal"
-          {...register('codigo', { required: 'El código es obligatorio' })}
-          error={!!errors.codigo}
-          helperText={errors.codigo?.message}
-          onBlur={handleCodigoBlur}
-        />
-
-        <FormControl fullWidth margin="normal" error={!!errors.programa}>
-          <InputLabel id="programa-label">Programa Académico</InputLabel>
-          <Controller
-            name="programa"
-            control={control}
-            defaultValue=""
-            rules={{ required: 'El programa es obligatorio' }}
-            render={({ field }) => (
-              <Select
-                {...field}
-                labelId="programa-label"
-                label="Programa Académico"
-              >
-                {programas.map((programa) => (
-                  <MenuItem key={programa} value={programa}>
-                    {programa}
-                  </MenuItem>
-                ))}
-              </Select>
+        {activeStep === 1 && (
+          <FormControl fullWidth margin="normal" error={!!errors.userType}>
+            <InputLabel id="user-type-label">Tipo de Usuario</InputLabel>
+            <Controller
+              name="userType"
+              control={control}
+              defaultValue="estudiante"
+              rules={{ required: 'El tipo es obligatorio' }}
+              render={({ field }) => (
+                <Select {...field} labelId="user-type-label" label="Tipo de Usuario">
+                  <MenuItem value="estudiante">Estudiante</MenuItem>
+                  <MenuItem value="docente">Docente</MenuItem>
+                </Select>
+              )}
+            />
+            {errors.userType && (
+              <Typography variant="caption" color="error">
+                {errors.userType.message}
+              </Typography>
             )}
-          />
-          {errors.programa && (
-            <Typography variant="caption" color="error">
-              {errors.programa.message}
-            </Typography>
-          )}
-        </FormControl>
+          </FormControl>
+        )}
 
-        <LoadingButton
-          type="submit"
-          fullWidth
-          variant="contained"
-          sx={{ mt: 3 }}
-          loading={loading}
-          disabled={!isValid || loading}
-        >
-          Registrar
-        </LoadingButton>
-      </Box>
+        {activeStep === 2 && userType === 'docente' && (
+          <Box>
+            <TextField
+              fullWidth
+              label="Dependencia"
+              margin="normal"
+              {...register('department', { required: 'La dependencia es obligatoria' })}
+              error={!!errors.department}
+              helperText={errors.department?.message}
+            />
+          </Box>
+        )}
+
+        {activeStep === 2 && userType === 'estudiante' && (
+          <Box>
+            <TextField
+              fullWidth
+              label="Código de Estudiante"
+              margin="normal"
+              {...register('studentCode', { required: 'El código es obligatorio' })}
+              error={!!errors.studentCode}
+              helperText={errors.studentCode?.message}
+            />
+            <FormControl fullWidth margin="normal" error={!!errors.program}>
+              <InputLabel id="program-label">Programa Académico</InputLabel>
+              <Controller
+                name="program"
+                control={control}
+                defaultValue=""
+                rules={{ required: 'El programa es obligatorio' }}
+                render={({ field }) => (
+                  <Select {...field} labelId="program-label" label="Programa Académico">
+                    {programs.map((program) => (
+                      <MenuItem key={program} value={program}>
+                        {program}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                )}
+              />
+              {errors.program && (
+                <Typography variant="caption" color="error">
+                  {errors.program.message}
+                </Typography>
+              )}
+            </FormControl>
+          </Box>
+        )}
+
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+          <Button disabled={activeStep === 0} onClick={handleBack}>
+            Atrás
+          </Button>
+          {activeStep === steps.length - 1 ? (
+            <LoadingButton type="submit" variant="contained" loading={loading} disabled={!isValid || loading}>
+              Registrar
+            </LoadingButton>
+          ) : (
+            <Button variant="contained" onClick={handleNext} disabled={!isValid || loading}>
+              Siguiente
+            </Button>
+          )}
+        </Box>
+      </form>
 
       <Snackbar
         open={openSnackbar}

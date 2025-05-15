@@ -11,31 +11,33 @@ export default function Home() {
 
   useEffect(() => {
     const checkStudent = async () => {
-      const studentCode = localStorage.getItem("studentCode");
+      const userId = localStorage.getItem("id");
 
-      if (!studentCode) {
+      if (!userId) {
         router.push("/register");
         return;
       }
 
       const q = query(
-        collection(db, "students"),
-        where("codigo", "==", studentCode)
+        collection(db, "users"),
+        where("id", "==", userId)
       );
       const querySnapshot = await getDocs(q);
 
       if (!querySnapshot.empty) {
-        const studentDoc = querySnapshot.docs[0].data();
-        const programa = studentDoc.programa;
-        const studentName = studentDoc.nombre;
+        const userDoc = querySnapshot.docs[0].data();
+        const data = {
+          userId: userDoc.id,
+          name: userDoc.name,
+          userType: userDoc.userType,
+          ...(userDoc.department && { department: userDoc.department }),
+          ...(userDoc.studentCode && { studentCode: userDoc.studentCode }),
+          ...(userDoc.program && { program: userDoc.program }),
+          createdAt: serverTimestamp(),
+        };
 
         // Guardar en history
-        await addDoc(collection(db, "history"), {
-          codigo: studentCode,
-          programa: programa,
-          nombre: studentName,
-          fechaAcceso: serverTimestamp(),
-        });
+        await addDoc(collection(db, "history"), data);
 
         setMessage("Ingreso exitosamente.");
       } else {
