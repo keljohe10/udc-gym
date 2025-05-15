@@ -94,9 +94,6 @@ export default function RegisterStepper() {
         createdAt: serverTimestamp(),
       });
       localStorage.setItem('id', data.id);
-      setSnackbarMessage('¡Registro exitoso!');
-      setSnackbarSeverity('success');
-      setOpenSnackbar(true);
       router.push('/success');
     } catch (error) {
       console.error('Error adding document:', error);
