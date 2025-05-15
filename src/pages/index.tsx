@@ -80,7 +80,7 @@ export default function Home() {
   };
 
   return (
-    <Container maxWidth="sm" sx={{ mt: 5 }}>
+    <Container sx={{ mt: 5 }}>
       {user && (
         <>
           {!isRegistered ? (
@@ -122,7 +122,7 @@ export default function Home() {
             <Box display="flex" justifyContent="center" alignItems="center">
               <CheckCircleOutlineOutlinedIcon color="success" sx={{ mr: 1 }} />
               <Typography variant="h5" align="center">
-                Ingreso exitosamente!
+                Asistencia registrada!
               </Typography>
             </Box>
           )}
