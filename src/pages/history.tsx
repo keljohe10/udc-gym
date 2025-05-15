@@ -50,6 +50,7 @@ export default function HistoryPage() {
       "Tipo de usuario": item.userType,
       Programa: item.program || 'N/A',
       Dependencia: item.department || 'N/A',
+      Sede: item.branch,
       "Fecha de Acceso": dayjs(item.createdAt.toDate()).format(
         "YYYY-MM-DD HH:mm"
       ),
@@ -116,6 +117,7 @@ export default function HistoryPage() {
             <TableCell sx={{ fontWeight: "bold" }}>
               Programa - Dependencia
             </TableCell>
+            <TableCell sx={{ fontWeight: "bold" }}>Sede</TableCell>
             <TableCell sx={{ fontWeight: "bold" }}>Fecha de Acceso</TableCell>
           </TableRow>
         </TableHead>
@@ -135,6 +137,7 @@ export default function HistoryPage() {
                   </span>
                 </Tooltip>
               </TableCell>
+              <TableCell>{item.branch}</TableCell>
               <TableCell>
                 {dayjs(item.createdAt.toDate()).format("DD/MM/YYYY HH:mm")}
               </TableCell>
