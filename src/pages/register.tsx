@@ -25,6 +25,8 @@ import {
   Step,
   StepLabel,
   Button,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import { LoadingButton } from '@mui/lab';
 import programs from '../data/program';
@@ -58,6 +60,9 @@ export default function RegisterStepper() {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
   const [openSnackbar, setOpenSnackbar] = useState(false);
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const validateStudentCode = async (studentCode: string) => {
     const q = query(collection(db, 'users'), where('studentCode', '==', studentCode));
@@ -135,7 +140,7 @@ export default function RegisterStepper() {
       <Typography variant="h4" align="center" gutterBottom>
         Registro de Usuario - UDC Gym
       </Typography>
-      <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
+      <Stepper activeStep={activeStep} sx={{ mb: 3 }} alternativeLabel={isMobile}>
         {steps.map((label) => (
           <Step key={label}>
             <StepLabel>{label}</StepLabel>

@@ -1,63 +1,116 @@
+// pages/index.tsx
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
+import {
+  Container,
+  Typography,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Button,
+  Box,
+} from "@mui/material";
+import {
+  addDoc,
+  collection,
+  getDocs,
+  query,
+  serverTimestamp,
+  where,
+} from "firebase/firestore";
 import { db } from "../firebase/config";
-import { Container, Typography, Box } from "@mui/material";
-import CheckCircleOutlineOutlinedIcon from '@mui/icons-material/CheckCircleOutlineOutlined';
+
+const sedes = ["Sede Norte", "Sede Centro", "Sede Sur"];
 
 export default function Home() {
+  const [codigo, setCodigo] = useState("");
+  const [user, setUser] = useState<any>(null);
+  const [sede, setSede] = useState("");
   const router = useRouter();
-  const [message, setMessage] = useState("Verificando...");
 
   useEffect(() => {
-    const checkStudent = async () => {
-      const userId = localStorage.getItem("id");
+    const userId = localStorage.getItem("id");
+    if (!userId) {
+      router.push("/register");
+      return;
+    }
+    setCodigo(userId);
 
-      if (!userId) {
-        router.push("/register");
-        return;
-      }
-
+    const fetchUser = async () => {
       const q = query(
         collection(db, "users"),
         where("id", "==", userId)
       );
-      const querySnapshot = await getDocs(q);
+      const snapshot = await getDocs(q);
 
-      if (!querySnapshot.empty) {
-        const userDoc = querySnapshot.docs[0].data();
-        const data = {
-          userId: userDoc.id,
-          name: userDoc.name,
-          userType: userDoc.userType,
-          ...(userDoc.department && { department: userDoc.department }),
-          ...(userDoc.studentCode && { studentCode: userDoc.studentCode }),
-          ...(userDoc.program && { program: userDoc.program }),
-          createdAt: serverTimestamp(),
-        };
-
-        // Guardar en history
-        await addDoc(collection(db, "history"), data);
-
-        setMessage("Ingreso exitosamente.");
+      if (!snapshot.empty) {
+        const userDoc = snapshot.docs[0];
+        const user = { id: userDoc.id, ...userDoc.data() };
+        setUser(user);
       } else {
+        console.error("Usuario no encontrado");
         router.push("/register");
       }
     };
 
-    checkStudent();
+    fetchUser();
   }, [router]);
 
+  const handleIngreso = async () => {
+    if (!user || !sede) return;
+
+    const data = {
+      codigo: user.studentCode,
+      nombre: user.name,
+      userType: user.userType,
+      program: user.program || null,
+      department: user.department || null,
+      sede,
+      createdAt: serverTimestamp(),
+    };
+
+    await addDoc(collection(db, "history"), data);
+  };
+
   return (
-    <Container maxWidth="sm" sx={{ mt: 10 }}>
-      <Box display="flex" justifyContent="center" alignItems="center">
-        {message === 'Ingreso exitosamente.' && (
-          <CheckCircleOutlineOutlinedIcon color="success" sx={{ mr: 1 }} />
-        )}
-        <Typography variant="h5" align="center">
-          {message}
-        </Typography>
-      </Box>
+    <Container maxWidth="sm" sx={{ mt: 5 }}>
+      {user && (
+        <>
+          <Typography variant="h5" gutterBottom>
+            Bienvenido, {user.name}
+          </Typography>
+          <Typography variant="subtitle1" gutterBottom>
+            ¿En cuál sede te encuentras?
+          </Typography>
+
+          <FormControl fullWidth sx={{ mt: 2 }}>
+            <InputLabel id="sede-label">Sede</InputLabel>
+            <Select
+              labelId="sede-label"
+              value={sede}
+              label="Sede"
+              onChange={(e) => setSede(e.target.value)}
+            >
+              {sedes.map((sede) => (
+                <MenuItem key={sede} value={sede}>
+                  {sede}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <Box sx={{ mt: 4 }}>
+            <Button
+              variant="contained"
+              disabled={!sede}
+              onClick={handleIngreso}
+            >
+              Registrar Ingreso
+            </Button>
+          </Box>
+        </>
+      )}
     </Container>
   );
 }
