@@ -40,41 +40,43 @@ export default function Register() {
     reset,
     control,
     formState: { errors },
+    setError,
+    clearErrors,
+    trigger,
   } = useForm<FormData>();
   const router = useRouter();
 
   const [loading, setLoading] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [snackbarSeverity, setSnackbarSeverity] =
-    useState<'success' | 'error'>('success');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
   const [openSnackbar, setOpenSnackbar] = useState(false);
+
+  const validateCodigo = async (codigo: string) => {
+    const q = query(collection(db, 'students'), where('codigo', '==', codigo));
+    const snapshot = await getDocs(q);
+    return snapshot.empty;
+  };
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     setLoading(true);
+    const isValid = await validateCodigo(data.codigo);
+
+    if (!isValid) {
+      setError('codigo', { type: 'manual', message: 'Este código ya está registrado' });
+      setLoading(false);
+      return;
+    }
+
     try {
-      const q = query(
-        collection(db, 'students'),
-        where('codigo', '==', data.codigo)
-      );
-      const querySnapshot = await getDocs(q);
+      await addDoc(collection(db, 'students'), {
+        ...data,
+        createdAt: serverTimestamp(),
+      });
 
-      if (!querySnapshot.empty) {
-        localStorage.setItem('studentCode', data.codigo);
-        setSnackbarMessage('Código ya registrado. Redirigiendo...');
-        setSnackbarSeverity('success');
-        setOpenSnackbar(true);
-        router.push('/');
-      } else {
-        await addDoc(collection(db, 'students'), {
-          ...data,
-          createdAt: serverTimestamp(),
-        });
-
-        localStorage.setItem('studentCode', data.codigo);
-        setSnackbarMessage('¡Registro exitoso!');
-        setSnackbarSeverity('success');
-        setOpenSnackbar(true);
-      }
+      localStorage.setItem('studentCode', data.codigo);
+      setSnackbarMessage('¡Registro exitoso!');
+      setSnackbarSeverity('success');
+      setOpenSnackbar(true);
       reset();
     } catch (error) {
       console.error('Error adding document: ', error);
@@ -83,6 +85,18 @@ export default function Register() {
       setOpenSnackbar(true);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCodigoBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value) {
+      const isValid = await validateCodigo(value);
+      if (!isValid) {
+        setError('codigo', { type: 'manual', message: 'Este código ya está registrado' });
+      } else {
+        clearErrors('codigo');
+      }
     }
   };
 
@@ -133,6 +147,7 @@ export default function Register() {
           {...register('codigo', { required: 'El código es obligatorio' })}
           error={!!errors.codigo}
           helperText={errors.codigo?.message}
+          onBlur={handleCodigoBlur}
         />
 
         <FormControl fullWidth margin="normal" error={!!errors.programa}>
