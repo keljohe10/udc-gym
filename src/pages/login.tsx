@@ -78,9 +78,9 @@ export default function LoginPage() {
         <LoadingButton
           fullWidth
           variant="contained"
-          sx={{ mt: 3 }}
           loading={loading}
           onClick={handleLogin}
+          sx={{ mt: 3 }}
         >
           Ingresar
         </LoadingButton>

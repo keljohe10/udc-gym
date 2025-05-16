@@ -45,11 +45,11 @@ export default function HistoryPage() {
 
   const exportToExcel = () => {
     const worksheetData = data.map((item: any) => ({
-      Codigo: item.studentCode || 'N/A',
+      Codigo: item.studentCode || "N/A",
       Nombre: item.name,
       "Tipo de usuario": item.userType,
-      Programa: item.program || 'N/A',
-      Dependencia: item.department || 'N/A',
+      Programa: item.program || "N/A",
+      Dependencia: item.department || "N/A",
       Sede: item.branch,
       "Fecha de Acceso": dayjs(item.createdAt.toDate()).format(
         "YYYY-MM-DD HH:mm"
@@ -62,27 +62,11 @@ export default function HistoryPage() {
     XLSX.writeFile(workbook, `historial-${selectedMonth}.xlsx`);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("adminAuth");
-    router.push("/login");
-  };
-
   return (
     <Container sx={{ mt: 5 }}>
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 3,
-        }}
-      >
-        <Typography variant="h4">Historial de Ingresos</Typography>
-        <Button variant="outlined" color="error" onClick={handleLogout}>
-          Cerrar sesión
-        </Button>
-      </Box>
-
+      <Typography sx={{ mb: 3 }} variant="h4">
+        Historial de Asistencias
+      </Typography>
       <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
         <Select
           value={selectedMonth}
@@ -108,52 +92,67 @@ export default function HistoryPage() {
         </Button>
       </Box>
 
-      <Table>
-        <TableHead>
-          <TableRow sx={{ backgroundColor: "#f0f0f0" }}>
-            <TableCell sx={{ fontWeight: "bold" }}>Código</TableCell>
-            <TableCell sx={{ fontWeight: "bold" }}>Nombre</TableCell>
-            <TableCell sx={{ fontWeight: "bold" }}>Tipo de usuario</TableCell>
-            <TableCell sx={{ fontWeight: "bold" }}>
-              Programa - Dependencia
-            </TableCell>
-            <TableCell sx={{ fontWeight: "bold" }}>Sede</TableCell>
-            <TableCell sx={{ fontWeight: "bold" }}>Fecha de Acceso</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {data.map((item: any) => (
-            <TableRow key={item.id}>
-              <TableCell>{item.studentCode || 'N/A'}</TableCell>
-              <TableCell>{item.name}</TableCell>
-              <TableCell>{item.userType}</TableCell>
-              <TableCell>
-                <Tooltip title={item.userType === 'estudiante' ? item.program || '' : item.department || ''}>
-                  <span>
-                    {(item.userType === 'estudiante' ? item.program : item.department)?.length > 30
-                      ? ((item.userType === 'estudiante' ? item.program : item.department).slice(0, 30) + '...')
-                      : (item.userType === 'estudiante' ? item.program : item.department)
-                    }
-                  </span>
-                </Tooltip>
+      <Box sx={{ overflowX: "auto" }}>
+        <Table>
+          <TableHead>
+            <TableRow sx={{ backgroundColor: "#f0f0f0" }}>
+              <TableCell sx={{ fontWeight: "bold" }}>Código</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Nombre</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Tipo de usuario</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>
+                Programa - Dependencia
               </TableCell>
-              <TableCell>{item.branch}</TableCell>
-              <TableCell>
-                {dayjs(item.createdAt.toDate()).format("DD/MM/YYYY HH:mm")}
-              </TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Sede</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Fecha de Acceso</TableCell>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHead>
+          <TableBody>
+            {data.map((item: any) => (
+              <TableRow key={item.id}>
+                <TableCell>{item.studentCode || "N/A"}</TableCell>
+                <TableCell>{item.name}</TableCell>
+                <TableCell>{item.userType}</TableCell>
+                <TableCell>
+                  <Tooltip
+                    title={
+                      item.userType === "estudiante"
+                        ? item.program || ""
+                        : item.department || ""
+                    }
+                  >
+                    <span>
+                      {(item.userType === "estudiante"
+                        ? item.program
+                        : item.department
+                      )?.length > 30
+                        ? (item.userType === "estudiante"
+                            ? item.program
+                            : item.department
+                          ).slice(0, 30) + "..."
+                        : item.userType === "estudiante"
+                        ? item.program
+                        : item.department}
+                    </span>
+                  </Tooltip>
+                </TableCell>
+                <TableCell>{item.branch}</TableCell>
+                <TableCell>
+                  {dayjs(item.createdAt.toDate()).format("DD/MM/YYYY HH:mm")}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
 
-      <TablePagination
-        component="div"
-        count={totalDocs}
-        page={page}
-        onPageChange={(_, newPage) => goToPage(newPage)}
-        rowsPerPage={pageSize}
-        rowsPerPageOptions={[pageSize]}
-      />
+        <TablePagination
+          component="div"
+          count={totalDocs}
+          page={page}
+          onPageChange={(_, newPage) => goToPage(newPage)}
+          rowsPerPage={pageSize}
+          rowsPerPageOptions={[pageSize]}
+        />
+      </Box>
     </Container>
   );
 }
