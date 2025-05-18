@@ -1,12 +1,18 @@
-import { Button, Container, Typography } from '@mui/material';
-import Image from 'next/image';
-import { useRouter } from 'next/router';
+import { Container, Typography } from "@mui/material";
+import Image from "next/image";
+import { useEffect } from "react";
+import { useRouter } from "next/router";
 
 export default function RegistroExitoso() {
   const router = useRouter();
 
+  useEffect(() => {
+    const userId = localStorage.getItem("id");
+    if (!userId) router.push("/register");
+  }, []);
+
   return (
-    <Container maxWidth="sm" sx={{ textAlign: 'center', mt: 8 }}>
+    <Container maxWidth="sm" sx={{ textAlign: "center", mt: 8 }}>
       <Image
         src="https://cdn-icons-png.flaticon.com/512/845/845646.png"
         alt="Registro exitoso"
@@ -19,7 +25,6 @@ export default function RegistroExitoso() {
       <Typography variant="body1" sx={{ mb: 4 }}>
         Tu información ha sido guardada correctamente. ¡Gracias por registrarte!
       </Typography>
-      <Button variant="contained" onClick={() => router.push('/register')}>Volver al inicio</Button>
     </Container>
   );
 }

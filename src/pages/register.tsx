@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { useForm, SubmitHandler, Controller } from 'react-hook-form';
-import { useRouter } from 'next/router';
+import { useState } from "react";
+import { useForm, SubmitHandler, Controller } from "react-hook-form";
+import { useRouter } from "next/router";
 import {
   collection,
   addDoc,
@@ -8,8 +8,8 @@ import {
   where,
   getDocs,
   serverTimestamp,
-} from 'firebase/firestore';
-import { db } from '../firebase/config';
+} from "firebase/firestore";
+import { db } from "../firebase/config";
 import {
   Container,
   TextField,
@@ -27,21 +27,25 @@ import {
   Button,
   useTheme,
   useMediaQuery,
-} from '@mui/material';
-import { LoadingButton } from '@mui/lab';
-import programs from '../data/program';
+} from "@mui/material";
+import { LoadingButton } from "@mui/lab";
+import programs from "../data/program";
 
 interface FormData {
   name: string;
   id: string;
   email: string;
-  userType: 'docente' | 'estudiante';
+  userType: "docente" | "estudiante" | "administrativo";
   department?: string;
   studentCode?: string;
   program?: string;
 }
 
-const steps = ['Información Básica', 'Tipo de Usuario', 'Información Adicional'];
+const steps = [
+  "Información Básica",
+  "Tipo de Usuario",
+  "Información Adicional",
+];
 
 export default function RegisterStepper() {
   const {
@@ -52,26 +56,32 @@ export default function RegisterStepper() {
     setError,
     watch,
     trigger,
-  } = useForm<FormData>({ mode: 'onChange' });
+  } = useForm<FormData>({ mode: "onChange" });
   const router = useRouter();
-  const userType = watch('userType');
+  const { attendance } = router.query;
+  const userType = watch("userType");
   const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error">(
+    "success"
+  );
   const [openSnackbar, setOpenSnackbar] = useState(false);
 
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const validateStudentCode = async (studentCode: string) => {
-    const q = query(collection(db, 'users'), where('studentCode', '==', studentCode));
+    const q = query(
+      collection(db, "users"),
+      where("studentCode", "==", studentCode)
+    );
     const snapshot = await getDocs(q);
     return snapshot.empty;
   };
 
   const validateId = async (id: string) => {
-    const q = query(collection(db, 'users'), where('id', '==', id));
+    const q = query(collection(db, "users"), where("id", "==", id));
     const snapshot = await getDocs(q);
     return snapshot.empty;
   };
@@ -80,45 +90,59 @@ export default function RegisterStepper() {
     setLoading(true);
     const idIsValid = await validateId(data.id);
     if (!idIsValid) {
-      setError('id', { type: 'manual', message: 'Este documento ya está registrado' });
+      setError("id", {
+        type: "manual",
+        message: "Este documento ya está registrado",
+      });
       setLoading(false);
       return;
     }
-    if (data.userType === 'estudiante') {
+    if (data.userType === "estudiante") {
       const codeIsValid = await validateStudentCode(data.studentCode!);
       if (!codeIsValid) {
-        setError('studentCode', { type: 'manual', message: 'Este código ya está registrado' });
+        setError("studentCode", {
+          type: "manual",
+          message: "Este código ya está registrado",
+        });
         setLoading(false);
         return;
       }
     }
 
     try {
-      await addDoc(collection(db, 'users'), {
+      await addDoc(collection(db, "users"), {
         ...data,
         createdAt: serverTimestamp(),
       });
-      localStorage.setItem('id', data.id);
-      router.push('/success');
+      localStorage.setItem("id", data.id);
     } catch (error) {
-      console.error('Error adding document:', error);
-      setSnackbarMessage('Ocurrió un error al guardar. Intenta de nuevo.');
-      setSnackbarSeverity('error');
+      console.error("Error adding document:", error);
+      setSnackbarMessage("Ocurrió un error al guardar. Intenta de nuevo.");
+      setSnackbarSeverity("error");
       setOpenSnackbar(true);
     } finally {
       setLoading(false);
+    }
+
+    if (attendance && attendance === "true") {
+      router.push("/");
+    } else {
+      router.push("/success");
     }
   };
 
   const handleNext = async () => {
     if (activeStep === 0) {
-      const isStepValid = await trigger(['name', 'id', 'email']);
+      const isStepValid = await trigger(["name", "id", "email"]);
       if (!isStepValid) return;
-      const idValue = watch('id');
+      const idValue = watch("id");
       if (idValue) {
         const idIsValid = await validateId(idValue);
         if (!idIsValid) {
-          setError('id', { type: 'manual', message: 'Este documento ya está registrado' });
+          setError("id", {
+            type: "manual",
+            message: "Este documento ya está registrado",
+          });
           return;
         }
       }
@@ -140,7 +164,11 @@ export default function RegisterStepper() {
       <Typography variant="h4" align="center" gutterBottom>
         Registro de Usuario - UDC Gym
       </Typography>
-      <Stepper activeStep={activeStep} sx={{ mb: 3 }} alternativeLabel={isMobile}>
+      <Stepper
+        activeStep={activeStep}
+        sx={{ mb: 3 }}
+        alternativeLabel={isMobile}
+      >
         {steps.map((label) => (
           <Step key={label}>
             <StepLabel>{label}</StepLabel>
@@ -154,7 +182,7 @@ export default function RegisterStepper() {
               fullWidth
               label="Nombre"
               margin="normal"
-              {...register('name', { required: 'El nombre es obligatorio' })}
+              {...register("name", { required: "El nombre es obligatorio" })}
               error={!!errors.name}
               helperText={errors.name?.message}
             />
@@ -162,7 +190,7 @@ export default function RegisterStepper() {
               fullWidth
               label="Documento de Identidad"
               margin="normal"
-              {...register('id', { required: 'El documento es obligatorio' })}
+              {...register("id", { required: "El documento es obligatorio" })}
               error={!!errors.id}
               helperText={errors.id?.message}
             />
@@ -171,11 +199,11 @@ export default function RegisterStepper() {
               label="Correo Electrónico"
               margin="normal"
               type="email"
-              {...register('email', {
-                required: 'El correo es obligatorio',
+              {...register("email", {
+                required: "El correo es obligatorio",
                 pattern: {
                   value: /^\S+@\S+$/i,
-                  message: 'Correo no válido',
+                  message: "Correo no válido",
                 },
               })}
               error={!!errors.email}
@@ -191,11 +219,16 @@ export default function RegisterStepper() {
               name="userType"
               control={control}
               defaultValue="estudiante"
-              rules={{ required: 'El tipo es obligatorio' }}
+              rules={{ required: "El tipo es obligatorio" }}
               render={({ field }) => (
-                <Select {...field} labelId="user-type-label" label="Tipo de Usuario">
+                <Select
+                  {...field}
+                  labelId="user-type-label"
+                  label="Tipo de Usuario"
+                >
                   <MenuItem value="estudiante">Estudiante</MenuItem>
                   <MenuItem value="docente">Docente</MenuItem>
+                  <MenuItem value="administrativo">Administrativo</MenuItem>
                 </Select>
               )}
             />
@@ -207,26 +240,31 @@ export default function RegisterStepper() {
           </FormControl>
         )}
 
-        {activeStep === 2 && userType === 'docente' && (
-          <Box>
-            <TextField
-              fullWidth
-              label="Dependencia"
-              margin="normal"
-              {...register('department', { required: 'La dependencia es obligatoria' })}
-              error={!!errors.department}
-              helperText={errors.department?.message}
-            />
-          </Box>
-        )}
+        {activeStep === 2 &&
+          ["docente", "administrativo"].includes(userType) && (
+            <Box>
+              <TextField
+                fullWidth
+                label="Dependencia - Programa"
+                margin="normal"
+                {...register("department", {
+                  required: "La dependencia es obligatoria",
+                })}
+                error={!!errors.department}
+                helperText={errors.department?.message}
+              />
+            </Box>
+          )}
 
-        {activeStep === 2 && userType === 'estudiante' && (
+        {activeStep === 2 && userType === "estudiante" && (
           <Box>
             <TextField
               fullWidth
               label="Código de Estudiante"
               margin="normal"
-              {...register('studentCode', { required: 'El código es obligatorio' })}
+              {...register("studentCode", {
+                required: "El código es obligatorio",
+              })}
               error={!!errors.studentCode}
               helperText={errors.studentCode?.message}
             />
@@ -236,9 +274,13 @@ export default function RegisterStepper() {
                 name="program"
                 control={control}
                 defaultValue=""
-                rules={{ required: 'El programa es obligatorio' }}
+                rules={{ required: "El programa es obligatorio" }}
                 render={({ field }) => (
-                  <Select {...field} labelId="program-label" label="Programa Académico">
+                  <Select
+                    {...field}
+                    labelId="program-label"
+                    label="Programa Académico"
+                  >
                     {programs.map((program) => (
                       <MenuItem key={program} value={program}>
                         {program}
@@ -256,16 +298,25 @@ export default function RegisterStepper() {
           </Box>
         )}
 
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", mt: 3 }}>
           <Button disabled={activeStep === 0} onClick={handleBack}>
             Atrás
           </Button>
           {activeStep === steps.length - 1 ? (
-            <LoadingButton type="submit" variant="contained" loading={loading} disabled={!isValid || loading}>
+            <LoadingButton
+              type="submit"
+              variant="contained"
+              loading={loading}
+              disabled={!isValid || loading}
+            >
               Registrar
             </LoadingButton>
           ) : (
-            <Button variant="contained" onClick={handleNext} disabled={!isValid || loading}>
+            <Button
+              variant="contained"
+              onClick={handleNext}
+              disabled={!isValid || loading}
+            >
               Siguiente
             </Button>
           )}
@@ -276,12 +327,12 @@ export default function RegisterStepper() {
         open={openSnackbar}
         autoHideDuration={3000}
         onClose={() => setOpenSnackbar(false)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
         <Alert
           onClose={() => setOpenSnackbar(false)}
           severity={snackbarSeverity}
-          sx={{ width: '100%' }}
+          sx={{ width: "100%" }}
         >
           {snackbarMessage}
         </Alert>

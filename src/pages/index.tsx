@@ -33,7 +33,10 @@ export default function Home() {
   useEffect(() => {
     const userId = localStorage.getItem("id");
     if (!userId) {
-      router.push("/register");
+      router.push({
+        pathname: "/register",
+        query: { attendance: "true" },
+      });
       return;
     }
 
@@ -47,7 +50,10 @@ export default function Home() {
         setUser(user);
       } else {
         console.error("Usuario no encontrado");
-        router.push("/register");
+        router.push({
+          pathname: "/register",
+          query: { attendance: "true" },
+        });
       }
     };
 

@@ -21,7 +21,7 @@ export default function Header() {
   };
 
   return (
-    <AppBar position="static" color="default">
+    <AppBar position="static" color="transparent">
       <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
         <Box>
           <Link
