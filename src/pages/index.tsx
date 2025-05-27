@@ -22,12 +22,16 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase/config";
 import branches from "../data/branch";
+import dayjs from "dayjs";
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [branch, setBranch] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isRegistered, setIsRegistered] = useState(false);
+  const [isRegistered, setIsRegistered] = useState({
+    value: false,
+    message: "",
+  });
   const router = useRouter();
 
   useEffect(() => {
@@ -64,6 +68,25 @@ export default function Home() {
     if (!user || !branch) return;
     setLoading(true);
 
+    const startOfDay = dayjs().startOf("day").toDate();
+    const endOfDay = dayjs().endOf("day").toDate();
+    const q = query(
+      collection(db, "history"),
+      where("userId", "==", user.id),
+      where("branch", "==", branch),
+      where("createdAt", ">=", startOfDay),
+      where("createdAt", "<=", endOfDay)
+    );
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      setLoading(false);
+      setIsRegistered({
+        value: true,
+        message: "Ya has registrado tu asistencia hoy en esta sede.",
+      });
+      return;
+    }
+
     const data = {
       userId: user.id,
       name: user.name,
@@ -77,7 +100,10 @@ export default function Home() {
 
     try {
       await addDoc(collection(db, "history"), data);
-      setIsRegistered(true);
+      setIsRegistered({
+        value: true,
+        message: "Asistencia registrada!",
+      });
       setLoading(false);
     } catch (error) {
       setLoading(false);
@@ -88,7 +114,7 @@ export default function Home() {
     <Container sx={{ mt: 5 }}>
       {user && (
         <>
-          {!isRegistered ? (
+          {!isRegistered.value ? (
             <>
               <Typography variant="h5" gutterBottom>
                 Bienvenido, {user.name}
@@ -127,7 +153,7 @@ export default function Home() {
             <Box display="flex" justifyContent="center" alignItems="center">
               <CheckCircleOutlineOutlinedIcon color="success" sx={{ mr: 1 }} />
               <Typography variant="h5" align="center">
-                Asistencia registrada!
+                {isRegistered.message}
               </Typography>
             </Box>
           )}
