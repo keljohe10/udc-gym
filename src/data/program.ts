@@ -3,6 +3,7 @@ const program = [
   "Administración Industrial",
   "Contaduría Pública (Diurna y Nocturna)",
   "Economía",
+  "Enfermería",
   "Biología",
   "Química",
   "Matemáticas",
