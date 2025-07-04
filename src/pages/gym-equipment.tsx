@@ -12,6 +12,7 @@ import {
   Snackbar,
   Alert,
   useMediaQuery,
+  Autocomplete,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
@@ -27,12 +28,14 @@ export default function GymEquipmentRegisterPage() {
     fechaRevision: dayjs().format("YYYY-MM-DD"),
     instructor: "",
     sede: branches[0] || "",
-    elemento: EQUIPMENT_LIST[0] || "",
+    elemento: "",
     estado: ESTADOS[0],
     descripcion: "",
     acciones: "",
     observaciones: "",
   });
+  const [elementoTouched, setElementoTouched] = useState(false);
+  const [formSubmitted, setFormSubmitted] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
   const [loading, setLoading] = useState(false);
   const theme = useTheme();
@@ -55,20 +58,27 @@ export default function GymEquipmentRegisterPage() {
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
+    setFormSubmitted(true);
     setLoading(true);
     try {
+      if (!form.elemento) {
+        setLoading(false);
+        return;
+      }
       await addDoc(collection(db, "gymEquipment"), form);
       setSnackbar({ open: true, message: "Registro guardado", severity: "success" });
       setForm({
         fechaRevision: dayjs().format("YYYY-MM-DD"),
         instructor: "",
         sede: branches[0] || "",
-        elemento: EQUIPMENT_LIST[0] || "",
+        elemento: "",
         estado: ESTADOS[0],
         descripcion: "",
         acciones: "",
         observaciones: "",
       });
+      setElementoTouched(false);
+      setFormSubmitted(false);
     } catch (err) {
       setSnackbar({ open: true, message: "Error al guardar", severity: "error" });
     } finally {
@@ -125,12 +135,28 @@ export default function GymEquipmentRegisterPage() {
           </Select>
         </FormControl>
         <FormControl fullWidth>
-          <InputLabel>Elemento deportivo</InputLabel>
-          <Select name="elemento" value={form.elemento} label="Elemento deportivo" onChange={handleFormChange} required>
-            {EQUIPMENT_LIST.map((el) => (
-              <MenuItem key={el} value={el}>{el}</MenuItem>
-            ))}
-          </Select>
+          <Autocomplete
+            freeSolo
+            options={EQUIPMENT_LIST}
+            value={form.elemento}
+            onChange={(_, newValue) => {
+              setForm((prev) => ({ ...prev, elemento: newValue || "" }));
+            }}
+            onInputChange={(_, newInputValue) => {
+              setForm((prev) => ({ ...prev, elemento: newInputValue }));
+            }}
+            onBlur={() => setElementoTouched(true)}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Elemento deportivo"
+                required
+                value={form.elemento}
+                error={(!form.elemento && (elementoTouched || formSubmitted))}
+                helperText={(!form.elemento && (elementoTouched || formSubmitted)) ? "Este campo es obligatorio" : ""}
+              />
+            )}
+          />
         </FormControl>
         <FormControl fullWidth>
           <InputLabel>Estado actual</InputLabel>
@@ -171,7 +197,7 @@ export default function GymEquipmentRegisterPage() {
           type="submit"
           variant="contained"
           sx={{ alignSelf: "center", minWidth: 180, mt: 2 }}
-          disabled={loading}
+          disabled={loading || !form.elemento}
         >
           {loading ? "Guardando..." : "Guardar registro"}
         </Button>
