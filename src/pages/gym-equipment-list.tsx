@@ -47,6 +47,7 @@ export default function GymEquipmentListPage() {
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; equipo: any | null }>({ open: false, equipo: null });
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
   const [filters, setFilters] = useState({ sede: "", estado: "", elemento: "" });
+  const [elementosUnicos, setElementosUnicos] = useState<string[]>([]);
 
   useEffect(() => {
     const isLoggedIn = localStorage.getItem("adminAuth");
@@ -63,7 +64,16 @@ export default function GymEquipmentListPage() {
     setLoading(true);
     const q = query(collection(db, "gymEquipment"), orderBy("fechaRevision", "desc"));
     const snapshot = await getDocs(q);
-    setEquipos(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    const equiposData: any[] = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    setEquipos(equiposData);
+    // Obtener elementos únicos de los registros y combinarlos con EQUIPMENT_LIST
+    const elementosSet = new Set<string>([...EQUIPMENT_LIST]);
+    equiposData.forEach((e) => {
+      if (e.elemento && typeof e.elemento === "string") {
+        elementosSet.add(e.elemento);
+      }
+    });
+    setElementosUnicos(Array.from(elementosSet).sort((a, b) => a.localeCompare(b)));
     setLoading(false);
   };
 
@@ -165,7 +175,7 @@ export default function GymEquipmentListPage() {
             onChange={(e) => setFilters((f) => ({ ...f, elemento: e.target.value }))}
           >
             <MenuItem value="">Todos</MenuItem>
-            {EQUIPMENT_LIST.map((el) => (
+            {elementosUnicos.map((el) => (
               <MenuItem key={el} value={el}>{el}</MenuItem>
             ))}
           </Select>
