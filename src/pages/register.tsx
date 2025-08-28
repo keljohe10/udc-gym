@@ -90,9 +90,12 @@ export default function RegisterStepper() {
     setLoading(true);
     const idIsValid = await validateId(data.id);
     if (!idIsValid) {
-      localStorage.setItem("id", data.id);
+      setError("id", {
+        type: "manual",
+        message: "Este documento ya está registrado",
+      });
       setLoading(false);
-      router.push("/");
+      return;
     }
     if (data.userType === "estudiante") {
       const codeIsValid = await validateStudentCode(data.studentCode!);
@@ -136,10 +139,8 @@ export default function RegisterStepper() {
       if (idValue) {
         const idIsValid = await validateId(idValue);
         if (!idIsValid) {
-          setError("id", {
-            type: "manual",
-            message: "Este documento ya está registrado",
-          });
+          localStorage.setItem("id", idValue);
+          router.push("/");
           return;
         }
       }
