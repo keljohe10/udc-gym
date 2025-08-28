@@ -90,12 +90,9 @@ export default function RegisterStepper() {
     setLoading(true);
     const idIsValid = await validateId(data.id);
     if (!idIsValid) {
-      setError("id", {
-        type: "manual",
-        message: "Este documento ya está registrado",
-      });
+      localStorage.setItem("id", data.id);
       setLoading(false);
-      return;
+      router.push("/");
     }
     if (data.userType === "estudiante") {
       const codeIsValid = await validateStudentCode(data.studentCode!);
