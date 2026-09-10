@@ -45,7 +45,14 @@ const traducirError = (code: number): ErrorGeolocalizacion => {
   return "no-disponible";
 };
 
-export function useGeolocalizacion(): ResultadoGeolocalizacion {
+/**
+ * @param activo cuando es `false` no se pide el permiso de ubicación. Se usa
+ * mientras se carga la configuración y cuando el geofence está desactivado:
+ * pedir la ubicación para luego ignorarla sería gratuito y molesto.
+ */
+export function useGeolocalizacion(
+  activo: boolean = true
+): ResultadoGeolocalizacion {
   const [estado, setEstado] = useState<EstadoGeolocalizacion>("solicitando");
   const [coords, setCoords] = useState<Coordenada | null>(null);
   const [precision, setPrecision] = useState<number | null>(null);
@@ -55,7 +62,7 @@ export function useGeolocalizacion(): ResultadoGeolocalizacion {
   const reintentar = useCallback(() => setIntento((n) => n + 1), []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !activo) return;
 
     if (!("geolocation" in navigator)) {
       setEstado("error");
@@ -124,7 +131,7 @@ export function useGeolocalizacion(): ResultadoGeolocalizacion {
       cancelado = true;
       detener();
     };
-  }, [intento]);
+  }, [intento, activo]);
 
   return { estado, coords, precision, error, reintentar };
 }

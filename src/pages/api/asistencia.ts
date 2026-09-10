@@ -39,20 +39,6 @@ export default async function handler(
   if (typeof sedeId !== "string" || !sedeId.trim()) {
     return res.status(400).json({ mensaje: "Falta la sede." });
   }
-  if (
-    !esNumeroFinito(lat) ||
-    !esNumeroFinito(lng) ||
-    lat < -90 ||
-    lat > 90 ||
-    lng < -180 ||
-    lng > 180
-  ) {
-    return res.status(400).json({ mensaje: "Coordenadas inválidas." });
-  }
-  if (!esNumeroFinito(precision) || precision < 0) {
-    return res.status(400).json({ mensaje: "Margen de precisión inválido." });
-  }
-
   try {
     // La configuración se resuelve primero y sin exigir la base: un rechazo por
     // geofence no debe gastar lecturas de Firestore ni depender de ella.
@@ -64,13 +50,28 @@ export default async function handler(
       return res.status(400).json({ mensaje: "La sede indicada no existe o está inactiva." });
     }
 
-    const coord = { lat, lng };
     let distancia = 0;
     let candidatas: string[] = [];
 
     // El interruptor permite operar sin geofence durante una incidencia sin
     // tener que desplegar; los registros quedan marcados como no verificados.
     if (config.geofenceActivo) {
+      // Solo se exigen coordenadas cuando el geofence está activo: con el
+      // interruptor apagado el estudiante ni siquiera comparte su ubicación.
+      if (
+        !esNumeroFinito(lat) ||
+        !esNumeroFinito(lng) ||
+        lat < -90 ||
+        lat > 90 ||
+        lng < -180 ||
+        lng > 180
+      ) {
+        return res.status(400).json({ mensaje: "Coordenadas inválidas." });
+      }
+      if (!esNumeroFinito(precision) || precision < 0) {
+        return res.status(400).json({ mensaje: "Margen de precisión inválido." });
+      }
+
       if (precision > PRECISION_MAXIMA_ABSOLUTA_METROS) {
         return res.status(422).json({
           mensaje:
@@ -80,6 +81,7 @@ export default async function handler(
 
       // Se recalcula todo aquí: el cliente nunca envía el radio ni decide solo
       // en qué sede está.
+      const coord = { lat, lng };
       const enRango = sedesEnRango(
         coord,
         activas,
@@ -149,13 +151,13 @@ export default async function handler(
       userType: usuario.userType,
       branch: sede.nombre,
       sedeId: sede.id,
-      lat,
-      lng,
-      precisionMetros: precision,
-      distanciaMetros: Math.round(distancia),
+      lat: esNumeroFinito(lat) ? lat : null,
+      lng: esNumeroFinito(lng) ? lng : null,
+      precisionMetros: esNumeroFinito(precision) ? precision : null,
+      distanciaMetros: config.geofenceActivo ? Math.round(distancia) : null,
       sedesCandidatas: candidatas,
       registroAmbiguo: candidatas.length > 1,
-      precisionBaja: precision > 50,
+      precisionBaja: esNumeroFinito(precision) && precision > 50,
       geoVerificado: config.geofenceActivo,
       origenValidacion: "servidor",
       createdAt: FieldValue.serverTimestamp(),
