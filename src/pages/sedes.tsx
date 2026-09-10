@@ -58,7 +58,7 @@ export default function SedesPage() {
   }, [sesion]);
 
   const actualizar = useCallback(
-    (id: string, campo: keyof Sede, valor: number | boolean) => {
+    (id: string, campo: keyof Sede, valor: number | boolean | undefined) => {
       setSedes((prev) =>
         prev.map((s) => (s.id === id ? { ...s, [campo]: valor } : s))
       );
@@ -155,7 +155,7 @@ export default function SedesPage() {
                     radioPorDefectoMetros: Number(e.target.value),
                   })
                 }
-                helperText="Se aplica a las sedes sin radio propio"
+                helperText="Rige toda sede que deje su radio vacío"
               />
               <FormControlLabel
                 control={
@@ -207,17 +207,34 @@ export default function SedesPage() {
                       {sede.tipo === "centro-tutorial" && " · Centro tutorial"}
                     </Typography>
                   </Box>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={sede.activa}
-                        onChange={(e) =>
-                          actualizar(sede.id, "activa", e.target.checked)
-                        }
-                      />
-                    }
-                    label="Activa"
-                  />
+                  <Stack direction="row" flexWrap="wrap" alignItems="center">
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={Boolean(sede.exentaGeofence)}
+                          onChange={(e) =>
+                            actualizar(
+                              sede.id,
+                              "exentaGeofence",
+                              e.target.checked
+                            )
+                          }
+                        />
+                      }
+                      label="Exenta de ubicación"
+                    />
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={sede.activa}
+                          onChange={(e) =>
+                            actualizar(sede.id, "activa", e.target.checked)
+                          }
+                        />
+                      }
+                      label="Activa"
+                    />
+                  </Stack>
                 </Stack>
 
                 <Divider sx={{ my: 2 }} />
@@ -252,12 +269,34 @@ export default function SedesPage() {
                     type="number"
                     size="small"
                     fullWidth
-                    value={sede.radioMetros}
+                    value={sede.radioMetros ?? ""}
+                    placeholder={String(config?.radioPorDefectoMetros ?? "")}
+                    InputLabelProps={{ shrink: true }}
                     onChange={(e) =>
-                      actualizar(sede.id, "radioMetros", Number(e.target.value))
+                      actualizar(
+                        sede.id,
+                        "radioMetros",
+                        e.target.value === ""
+                          ? undefined
+                          : Number(e.target.value)
+                      )
+                    }
+                    helperText={
+                      sede.radioMetros === undefined ||
+                      sede.radioMetros === null
+                        ? `Hereda el general (${config?.radioPorDefectoMetros ?? "—"} m)`
+                        : "Déjalo vacío para heredar el general"
                     }
                   />
                 </Stack>
+
+                {sede.exentaGeofence && (
+                  <Alert severity="warning" sx={{ mt: 2 }}>
+                    Quien elija esta sede podrá registrar asistencia desde
+                    cualquier lugar. Los registros quedan marcados como no
+                    verificados.
+                  </Alert>
+                )}
 
                 <Stack
                   direction="row"

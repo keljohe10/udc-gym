@@ -34,8 +34,10 @@ export async function cargarSedes(): Promise<{
       db.collection("config").doc("geofence").get(),
     ]);
 
-    const overrides = new Map<string, Partial<Sede>>();
-    snapSedes.forEach((doc) => overrides.set(doc.id, doc.data() as Partial<Sede>));
+    // Los ajustes se guardan como campos sueltos, no como copias completas de
+    // la sede: `radioMetros: null` significa «heredar el radio general».
+    const overrides = new Map<string, Record<string, unknown>>();
+    snapSedes.forEach((doc) => overrides.set(doc.id, doc.data()));
 
     const sedes = SEDES.map((sede) => {
       const o = overrides.get(sede.id);
@@ -45,7 +47,15 @@ export async function cargarSedes(): Promise<{
         lat: typeof o.lat === "number" ? o.lat : sede.lat,
         lng: typeof o.lng === "number" ? o.lng : sede.lng,
         radioMetros:
-          typeof o.radioMetros === "number" ? o.radioMetros : sede.radioMetros,
+          o.radioMetros === null
+            ? undefined
+            : typeof o.radioMetros === "number"
+            ? o.radioMetros
+            : sede.radioMetros,
+        exentaGeofence:
+          typeof o.exentaGeofence === "boolean"
+            ? o.exentaGeofence
+            : sede.exentaGeofence,
         activa: typeof o.activa === "boolean" ? o.activa : sede.activa,
       };
     });

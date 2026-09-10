@@ -52,9 +52,19 @@ export default async function handler(
               .status(400)
               .json({ mensaje: `Coordenadas inválidas en "${base.nombre}".` });
           }
-          if (!esNumeroFinito(sede.radioMetros) || sede.radioMetros < 20 || sede.radioMetros > 20000) {
+          // Vacío o nulo significa «heredar el radio general».
+          const heredaRadio =
+            sede.radioMetros === null ||
+            sede.radioMetros === undefined ||
+            sede.radioMetros === "";
+          if (
+            !heredaRadio &&
+            (!esNumeroFinito(sede.radioMetros) ||
+              sede.radioMetros < 20 ||
+              sede.radioMetros > 20000)
+          ) {
             return res.status(400).json({
-              mensaje: `El radio de "${base.nombre}" debe estar entre 20 y 20000 metros.`,
+              mensaje: `El radio de "${base.nombre}" debe estar entre 20 y 20000 metros, o vacío para heredar el general.`,
             });
           }
 
@@ -63,7 +73,8 @@ export default async function handler(
             {
               lat: sede.lat,
               lng: sede.lng,
-              radioMetros: Math.round(sede.radioMetros),
+              radioMetros: heredaRadio ? null : Math.round(sede.radioMetros),
+              exentaGeofence: Boolean(sede.exentaGeofence),
               activa: Boolean(sede.activa),
               actualizadoPor: admin,
               actualizadoEn: FieldValue.serverTimestamp(),

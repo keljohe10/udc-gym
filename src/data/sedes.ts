@@ -15,12 +15,25 @@ export interface Sede {
   ciudad: string;
   lat: number;
   lng: number;
-  /** Perímetro de asistencia válido, en metros. */
-  radioMetros: number;
+  /**
+   * Perímetro de asistencia válido, en metros. Si se omite, la sede hereda el
+   * radio general configurable desde /sedes.
+   */
+  radioMetros?: number;
+  /**
+   * Exime a esta sede de la validación por ubicación, sin apagarla en el resto
+   * del sistema. Pensado para una sede con cobertura GPS deficiente mientras se
+   * resuelve. Ausente significa que sí se exige ubicación.
+   */
+  exentaGeofence?: boolean;
+  /** Si la sede aparece o no en el formulario. No exime del geofence. */
   activa: boolean;
 }
 
-/** Radio usado cuando una sede no define el suyo. */
+/**
+ * Radio que se aplica a toda sede que no defina el suyo. Es el valor que la
+ * pantalla /sedes deja configurar bajo «Radio por defecto».
+ */
 export const RADIO_POR_DEFECTO_METROS = 2000;
 
 /**
@@ -68,7 +81,6 @@ export const SEDES: Sede[] = [
     ciudad: "El Carmen de Bolívar",
     lat: 9.7211019,
     lng: -75.1169264,
-    radioMetros: RADIO_POR_DEFECTO_METROS,
     activa: true,
   },
   {
@@ -78,7 +90,6 @@ export const SEDES: Sede[] = [
     ciudad: "San Juan de Nepomuceno",
     lat: 9.9623914,
     lng: -75.0808722,
-    radioMetros: RADIO_POR_DEFECTO_METROS,
     activa: true,
   },
   {
@@ -88,7 +99,6 @@ export const SEDES: Sede[] = [
     ciudad: "Magangué",
     lat: 9.2394138,
     lng: -74.7598118,
-    radioMetros: RADIO_POR_DEFECTO_METROS,
     activa: true,
   },
 ];

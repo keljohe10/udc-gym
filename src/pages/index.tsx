@@ -88,8 +88,12 @@ export default function Home() {
       });
   }, []);
 
-  const geofenceActivo = config?.geofenceActivo ?? true;
   const configurado = sedes !== null && config !== null;
+  const sedeSeleccionada = sedes?.find((s) => s.id === sedeId) ?? null;
+  // La ubicación se exige salvo que el interruptor general esté apagado o que
+  // la sede elegida esté exenta. Sin sede elegida todavía no se sabe.
+  const requiereUbicacion =
+    (config?.geofenceActivo ?? true) && !sedeSeleccionada?.exentaGeofence;
 
   /**
    * La ubicación se pide aquí y no al cargar la página: solo tiene sentido
@@ -102,7 +106,7 @@ export default function Home() {
     setError(null);
 
     let lectura = null;
-    if (geofenceActivo) {
+    if (requiereUbicacion) {
       setEnvio("ubicando");
       try {
         lectura = await obtenerUbicacion();
@@ -203,14 +207,15 @@ export default function Home() {
             </Select>
           </FormControl>
 
-          {geofenceActivo && (
+          {sedeId && (
             <Typography
               variant="caption"
               color="text.secondary"
               sx={{ display: "block", mt: 1 }}
             >
-              Al registrar tu ingreso confirmaremos que estás en la sede que
-              elegiste.
+              {requiereUbicacion
+                ? "Al registrar tu ingreso confirmaremos que estás en la sede que elegiste."
+                : "Esta sede no requiere verificación por ubicación."}
             </Typography>
           )}
 
