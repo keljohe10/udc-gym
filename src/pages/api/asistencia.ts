@@ -6,9 +6,9 @@ import { cargarSedes } from "../../lib/sedes.server";
 import { ventanaDelDiaColombia } from "../../lib/fechas";
 import {
   PRECISION_MAXIMA_ABSOLUTA_METROS,
+  formatearDistancia,
   precisionMaximaParaRadio,
-  sedesEnRango,
-  sedeMasCercana,
+  sedesPorCercania,
 } from "../../lib/geo";
 
 interface Cuerpo {
@@ -82,38 +82,42 @@ export default async function handler(
       // Se recalcula todo aquí: el cliente nunca envía el radio ni decide solo
       // en qué sede está.
       const coord = { lat, lng };
-      const enRango = sedesEnRango(
+      const evaluadas = sedesPorCercania(
         coord,
         activas,
         config.radioPorDefectoMetros,
         precision
       );
-      candidatas = enRango.map((c) => c.sede.id);
+      // Se deja constancia de qué otras sedes también contenían al usuario,
+      // para poder medir después cuántos registros fueron ambiguos.
+      candidatas = evaluadas.filter((c) => c.dentro).map((c) => c.sede.id);
 
-      const elegida = enRango.find((c) => c.sede.id === sedeId);
-      if (!elegida) {
-        const masCercana = sedeMasCercana(
-          coord,
-          activas,
-          config.radioPorDefectoMetros,
-          precision
-        );
+      // Se valida contra la sede que el usuario eligió, no contra la más
+      // cercana: son cosas distintas y el mensaje debe hablar de la suya.
+      const objetivo = evaluadas.find((c) => c.sede.id === sedeId);
+      if (!objetivo) {
+        return res.status(400).json({ mensaje: "La sede indicada no existe." });
+      }
+
+      if (!objetivo.dentro) {
         return res.status(403).json({
-          mensaje: "No estás dentro del perímetro del gimnasio.",
-          distanciaMetros: masCercana ? Math.round(masCercana.distanciaMetros) : null,
-          radioMetros: masCercana ? masCercana.radioMetros : null,
-          sedeMasCercana: masCercana ? masCercana.sede.nombre : null,
+          mensaje:
+            `Estás a ${formatearDistancia(objetivo.distanciaMetros)} de ${sede.nombre}. ` +
+            `Debes estar a menos de ${formatearDistancia(objetivo.radioMetros)} para registrar tu asistencia.`,
+          sede: sede.nombre,
+          distanciaMetros: Math.round(objetivo.distanciaMetros),
+          radioMetros: objetivo.radioMetros,
         });
       }
 
-      if (precision > precisionMaximaParaRadio(elegida.radioMetros)) {
+      if (precision > precisionMaximaParaRadio(objetivo.radioMetros)) {
         return res.status(422).json({
           mensaje:
             "La precisión de tu ubicación es demasiado baja para confirmar esta sede. Intenta de nuevo.",
         });
       }
 
-      distancia = elegida.distanciaMetros;
+      distancia = objetivo.distanciaMetros;
     }
 
     const db = obtenerDbAdmin();

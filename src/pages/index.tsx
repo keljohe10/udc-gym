@@ -1,24 +1,20 @@
 // pages/index.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import {
   Alert,
   AlertTitle,
   Box,
-  Button,
   CircularProgress,
   Container,
   FormControl,
   InputLabel,
   MenuItem,
   Select,
-  Stack,
   Typography,
 } from "@mui/material";
 import { LoadingButton } from "@mui/lab";
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
-import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
-import MyLocationOutlinedIcon from "@mui/icons-material/MyLocationOutlined";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../firebase/config";
 import {
@@ -26,18 +22,7 @@ import {
   sedesActivas,
   type Sede,
 } from "../data/sedes";
-import {
-  PRECISION_MAXIMA_ABSOLUTA_METROS,
-  formatearDistancia,
-  precisionMaximaParaRadio,
-  sedesEnRango,
-  sedeMasCercana,
-  type SedeConDistancia,
-} from "../lib/geo";
-import {
-  MENSAJES_ERROR,
-  useGeolocalizacion,
-} from "../hooks/useGeolocalizacion";
+import { ErrorUbicacion, obtenerUbicacion } from "../lib/ubicacion";
 
 interface ConfigGeofence {
   radioPorDefectoMetros: number;
@@ -51,51 +36,22 @@ const CONFIG_RESPALDO: ConfigGeofence = {
   geofenceActivo: true,
 };
 
-type Ubicacion =
-  | { tipo: "evaluando" }
-  | { tipo: "precision-baja"; precision: number }
-  | { tipo: "fuera-de-rango"; masCercana: SedeConDistancia }
-  | { tipo: "en-rango"; candidatas: SedeConDistancia[] };
+type Envio = "inactivo" | "ubicando" | "registrando";
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
-  const [sedeElegida, setSedeElegida] = useState<Sede | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [isRegistered, setIsRegistered] = useState({
-    value: false,
-    message: "",
-  });
-  const [errorRegistro, setErrorRegistro] = useState<string | null>(null);
-  // Sedes y estado del geofence vienen del servidor: el interruptor de /sedes y
-  // las coordenadas ajustadas en sitio deben regir también en el navegador.
   const [sedes, setSedes] = useState<Sede[] | null>(null);
   const [config, setConfig] = useState<ConfigGeofence | null>(null);
+  const [sedeId, setSedeId] = useState("");
+  const [envio, setEnvio] = useState<Envio>("inactivo");
+  const [error, setError] = useState<string | null>(null);
+  const [registrado, setRegistrado] = useState<string | null>(null);
   const router = useRouter();
-
-  const configurado = sedes !== null && config !== null;
-  const geofenceActivo = config?.geofenceActivo ?? true;
-  const geo = useGeolocalizacion(configurado && geofenceActivo);
-
-  useEffect(() => {
-    fetch("/api/sedes")
-      .then((r) => r.json())
-      .then((d) => {
-        setSedes(Array.isArray(d?.sedes) && d.sedes.length ? d.sedes : sedesActivas());
-        setConfig(d?.config ?? CONFIG_RESPALDO);
-      })
-      .catch(() => {
-        setSedes(sedesActivas());
-        setConfig(CONFIG_RESPALDO);
-      });
-  }, []);
 
   useEffect(() => {
     const userId = localStorage.getItem("id");
     if (!userId) {
-      router.push({
-        pathname: "/register",
-        query: { attendance: "true" },
-      });
+      router.push({ pathname: "/register", query: { attendance: "true" } });
       return;
     }
 
@@ -105,84 +61,74 @@ export default function Home() {
 
       if (!snapshot.empty) {
         const userDoc = snapshot.docs[0];
-        const user = { id: userDoc.id, ...userDoc.data() };
-        setUser(user);
+        setUser({ id: userDoc.id, ...userDoc.data() });
       } else {
         console.error("Usuario no encontrado");
-        router.push({
-          pathname: "/register",
-          query: { attendance: "true" },
-        });
+        router.push({ pathname: "/register", query: { attendance: "true" } });
       }
     };
 
     fetchUser();
   }, [router]);
 
-  const ubicacion = useMemo<Ubicacion>(() => {
-    if (!sedes || !config || !geofenceActivo) return { tipo: "evaluando" };
-    if (geo.estado !== "obtenida" || !geo.coords || geo.precision === null) {
-      return { tipo: "evaluando" };
-    }
-
-    const radioPorDefecto = config.radioPorDefectoMetros;
-
-    // Por encima de este margen la lectura viene de una torre celular: no
-    // distingue entre sedes ni siquiera en los centros tutoriales.
-    if (geo.precision > PRECISION_MAXIMA_ABSOLUTA_METROS) {
-      return { tipo: "precision-baja", precision: geo.precision };
-    }
-
-    const masCercana = sedeMasCercana(
-      geo.coords,
-      sedes,
-      radioPorDefecto,
-      geo.precision
-    );
-    if (!masCercana) return { tipo: "evaluando" };
-
-    const candidatas = sedesEnRango(
-      geo.coords,
-      sedes,
-      radioPorDefecto,
-      geo.precision
-    );
-
-    // Estar fuera es una conclusión útil aunque la lectura sea imprecisa, así
-    // que se informa antes de pedir un reintento por precisión.
-    if (candidatas.length === 0) return { tipo: "fuera-de-rango", masCercana };
-
-    if (geo.precision > precisionMaximaParaRadio(masCercana.radioMetros)) {
-      return { tipo: "precision-baja", precision: geo.precision };
-    }
-
-    return { tipo: "en-rango", candidatas };
-  }, [sedes, config, geofenceActivo, geo.estado, geo.coords, geo.precision]);
-
-  // Con una sola sede en rango no tiene sentido preguntar: se elige sola.
+  // Sedes y estado del geofence vienen del servidor: el interruptor de /sedes y
+  // las coordenadas ajustadas en sitio deben regir también aquí.
   useEffect(() => {
-    if (ubicacion.tipo === "en-rango" && ubicacion.candidatas.length === 1) {
-      setSedeElegida(ubicacion.candidatas[0].sede);
-    }
-  }, [ubicacion]);
+    fetch("/api/sedes")
+      .then((r) => r.json())
+      .then((d) => {
+        setSedes(
+          Array.isArray(d?.sedes) && d.sedes.length ? d.sedes : sedesActivas()
+        );
+        setConfig(d?.config ?? CONFIG_RESPALDO);
+      })
+      .catch(() => {
+        setSedes(sedesActivas());
+        setConfig(CONFIG_RESPALDO);
+      });
+  }, []);
 
+  const geofenceActivo = config?.geofenceActivo ?? true;
+  const configurado = sedes !== null && config !== null;
+
+  /**
+   * La ubicación se pide aquí y no al cargar la página: solo tiene sentido
+   * validarla contra la sede que el usuario acaba de elegir. Pedirla antes
+   * obligaba a evaluar contra la sede más cercana, que no es necesariamente
+   * aquella en la que quiere registrarse.
+   */
   const handleIngreso = async () => {
-    if (!user || !sedeElegida) return;
-    if (geofenceActivo && (!geo.coords || geo.precision === null)) return;
-    setLoading(true);
-    setErrorRegistro(null);
+    if (!user || !sedeId) return;
+    setError(null);
 
+    let lectura = null;
+    if (geofenceActivo) {
+      setEnvio("ubicando");
+      try {
+        lectura = await obtenerUbicacion();
+      } catch (e) {
+        setError(
+          e instanceof ErrorUbicacion
+            ? e.message
+            : "No pudimos obtener tu ubicación."
+        );
+        setEnvio("inactivo");
+        return;
+      }
+    }
+
+    setEnvio("registrando");
     try {
       const respuesta = await fetch("/api/asistencia", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
-          sedeId: sedeElegida.id,
-          ...(geo.coords && {
-            lat: geo.coords.lat,
-            lng: geo.coords.lng,
-            precision: geo.precision,
+          sedeId,
+          ...(lectura && {
+            lat: lectura.lat,
+            lng: lectura.lng,
+            precision: lectura.precision,
           }),
         }),
       });
@@ -190,70 +136,36 @@ export default function Home() {
 
       // 409 es "ya registraste hoy": no es un fallo que deba reintentarse.
       if (respuesta.ok || respuesta.status === 409) {
-        setIsRegistered({
-          value: true,
-          message: datos.mensaje ?? "Asistencia registrada!",
-        });
+        setRegistrado(datos.mensaje ?? "Asistencia registrada!");
         return;
       }
 
-      setErrorRegistro(
+      setError(
         datos.mensaje ?? "No pudimos registrar tu asistencia. Intenta de nuevo."
       );
     } catch {
-      setErrorRegistro(
+      setError(
         "No pudimos conectar con el servidor. Verifica tu conexión e intenta de nuevo."
       );
     } finally {
-      setLoading(false);
+      setEnvio("inactivo");
     }
   };
 
   if (!user) return null;
 
-  if (isRegistered.value) {
+  if (registrado) {
     return (
       <Container sx={{ mt: 5 }}>
         <Box display="flex" justifyContent="center" alignItems="center">
           <CheckCircleOutlineOutlinedIcon color="success" sx={{ mr: 1 }} />
           <Typography variant="h5" align="center">
-            {isRegistered.message}
+            {registrado}
           </Typography>
         </Box>
       </Container>
     );
   }
-
-  const bloqueRegistro = (
-    <>
-      {errorRegistro && (
-        <Alert severity="error" sx={{ mt: 2 }}>
-          {errorRegistro}
-        </Alert>
-      )}
-      <Box sx={{ mt: 4 }}>
-        <LoadingButton
-          variant="contained"
-          loading={loading}
-          disabled={!sedeElegida}
-          onClick={handleIngreso}
-        >
-          Registrar Ingreso
-        </LoadingButton>
-      </Box>
-    </>
-  );
-
-  const botonReintentar = (
-    <Button
-      size="small"
-      startIcon={<MyLocationOutlinedIcon />}
-      onClick={geo.reintentar}
-      sx={{ mt: 1 }}
-    >
-      Volver a intentar
-    </Button>
-  );
 
   return (
     <Container sx={{ mt: 5 }}>
@@ -261,30 +173,27 @@ export default function Home() {
         Bienvenido, {user.name}
       </Typography>
 
-      {!configurado && (
+      {!configurado ? (
         <Box sx={{ display: "flex", alignItems: "center", gap: 2, mt: 3 }}>
           <CircularProgress size={22} />
           <Typography variant="body1">Cargando...</Typography>
         </Box>
-      )}
+      ) : (
+        <>
+          <Typography variant="subtitle1" gutterBottom>
+            ¿En cuál sede te encuentras?
+          </Typography>
 
-      {configurado && !geofenceActivo && (
-        <Box sx={{ mt: 3 }}>
-          <Alert severity="info">
-            La verificación por ubicación está desactivada. Indica en cuál sede
-            te encuentras.
-          </Alert>
           <FormControl fullWidth sx={{ mt: 2 }}>
             <InputLabel id="sede-label">Sede</InputLabel>
             <Select
               labelId="sede-label"
               label="Sede"
-              value={sedeElegida?.id ?? ""}
-              onChange={(e) =>
-                setSedeElegida(
-                  sedes?.find((s) => s.id === e.target.value) ?? null
-                )
-              }
+              value={sedeId}
+              onChange={(e) => {
+                setSedeId(e.target.value);
+                setError(null);
+              }}
             >
               {(sedes ?? []).map((sede) => (
                 <MenuItem key={sede.id} value={sede.id}>
@@ -293,86 +202,39 @@ export default function Home() {
               ))}
             </Select>
           </FormControl>
-          {bloqueRegistro}
-        </Box>
-      )}
 
-      {configurado && geofenceActivo && geo.estado === "solicitando" && (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mt: 3 }}>
-          <CircularProgress size={22} />
-          <Typography variant="body1">
-            Confirmando que estás en el gimnasio...
-          </Typography>
-        </Box>
-      )}
-
-      {configurado && geofenceActivo && geo.estado === "error" && geo.error && (
-        <Alert severity="warning" sx={{ mt: 3 }}>
-          <AlertTitle>No pudimos verificar tu ubicación</AlertTitle>
-          {MENSAJES_ERROR[geo.error]}
-          {geo.error !== "no-soportado" && botonReintentar}
-        </Alert>
-      )}
-
-      {geofenceActivo && geo.estado === "obtenida" && ubicacion.tipo === "precision-baja" && (
-        <Alert severity="warning" sx={{ mt: 3 }}>
-          <AlertTitle>Ubicación poco precisa</AlertTitle>
-          La precisión de tu ubicación es baja (±
-          {formatearDistancia(ubicacion.precision)}). Sal a un espacio abierto e
-          intenta de nuevo.
-          {botonReintentar}
-        </Alert>
-      )}
-
-      {geofenceActivo && geo.estado === "obtenida" && ubicacion.tipo === "fuera-de-rango" && (
-        <Alert severity="error" sx={{ mt: 3 }}>
-          <AlertTitle>Estás fuera del gimnasio</AlertTitle>
-          Estás a {formatearDistancia(ubicacion.masCercana.distanciaMetros)} de{" "}
-          {ubicacion.masCercana.sede.nombre}, la sede más cercana. Debes estar a
-          menos de {formatearDistancia(ubicacion.masCercana.radioMetros)} para
-          registrar tu asistencia.
-          {botonReintentar}
-        </Alert>
-      )}
-
-      {geofenceActivo && geo.estado === "obtenida" && ubicacion.tipo === "en-rango" && (
-        <Box sx={{ mt: 3 }}>
-          {ubicacion.candidatas.length === 1 ? (
-            <Alert severity="success" icon={<LocationOnOutlinedIcon />}>
-              <AlertTitle>Ubicación confirmada</AlertTitle>
-              Estás en <strong>{ubicacion.candidatas[0].sede.nombre}</strong>
-              {geo.precision !== null &&
-                ` (±${formatearDistancia(geo.precision)})`}
-              .
-            </Alert>
-          ) : (
-            <>
-              <Typography variant="subtitle1" gutterBottom>
-                Estás cerca de más de una sede. ¿En cuál te encuentras?
-              </Typography>
-              <Stack spacing={1} sx={{ mt: 2 }}>
-                {ubicacion.candidatas.map(({ sede, distanciaMetros }) => (
-                  <Button
-                    key={sede.id}
-                    fullWidth
-                    variant={
-                      sedeElegida?.id === sede.id ? "contained" : "outlined"
-                    }
-                    onClick={() => setSedeElegida(sede)}
-                    sx={{ justifyContent: "space-between" }}
-                  >
-                    <span>{sede.nombre}</span>
-                    <Typography variant="caption">
-                      a {formatearDistancia(distanciaMetros)}
-                    </Typography>
-                  </Button>
-                ))}
-              </Stack>
-            </>
+          {geofenceActivo && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "block", mt: 1 }}
+            >
+              Al registrar tu ingreso confirmaremos que estás en la sede que
+              elegiste.
+            </Typography>
           )}
 
-          {bloqueRegistro}
-        </Box>
+          {error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              <AlertTitle>No pudimos registrar tu asistencia</AlertTitle>
+              {error}
+            </Alert>
+          )}
+
+          <Box sx={{ mt: 4 }}>
+            <LoadingButton
+              variant="contained"
+              loading={envio !== "inactivo"}
+              loadingIndicator={
+                envio === "ubicando" ? "Verificando ubicación..." : "Registrando..."
+              }
+              disabled={!sedeId}
+              onClick={handleIngreso}
+            >
+              Registrar Ingreso
+            </LoadingButton>
+          </Box>
+        </>
       )}
     </Container>
   );
