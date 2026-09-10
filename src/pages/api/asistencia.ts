@@ -53,9 +53,13 @@ export default async function handler(
     let distancia = 0;
     let candidatas: string[] = [];
 
-    // El interruptor permite operar sin geofence durante una incidencia sin
-    // tener que desplegar; los registros quedan marcados como no verificados.
-    if (config.geofenceActivo) {
+    // Se exige ubicación salvo que el interruptor general esté apagado o que
+    // esta sede en concreto esté exenta. Ambos son válvulas de escape para
+    // operar durante una incidencia sin desplegar; los registros resultantes
+    // quedan marcados como no verificados.
+    const requiereUbicacion = config.geofenceActivo && !sede.exentaGeofence;
+
+    if (requiereUbicacion) {
       // Solo se exigen coordenadas cuando el geofence está activo: con el
       // interruptor apagado el estudiante ni siquiera comparte su ubicación.
       if (
@@ -158,11 +162,18 @@ export default async function handler(
       lat: esNumeroFinito(lat) ? lat : null,
       lng: esNumeroFinito(lng) ? lng : null,
       precisionMetros: esNumeroFinito(precision) ? precision : null,
-      distanciaMetros: config.geofenceActivo ? Math.round(distancia) : null,
+      distanciaMetros: requiereUbicacion ? Math.round(distancia) : null,
       sedesCandidatas: candidatas,
       registroAmbiguo: candidatas.length > 1,
       precisionBaja: esNumeroFinito(precision) && precision > 50,
-      geoVerificado: config.geofenceActivo,
+      geoVerificado: requiereUbicacion,
+      // Distinguir el motivo permite auditar después si la exención se quedó
+      // encendida más tiempo del necesario.
+      motivoSinVerificar: requiereUbicacion
+        ? null
+        : sede.exentaGeofence
+        ? "sede-exenta"
+        : "geofence-desactivado",
       origenValidacion: "servidor",
       createdAt: FieldValue.serverTimestamp(),
       ...(usuario.department && { department: usuario.department }),
