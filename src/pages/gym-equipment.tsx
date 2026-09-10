@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   Container,
   Typography,
@@ -18,16 +18,20 @@ import { useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
 import { db } from "../firebase/config";
 import { collection, addDoc } from "firebase/firestore";
-import branches, { EQUIPMENT_LIST } from "../data/branch";
+import { nombresSedes } from "../data/sedes";
+import { EQUIPMENT_LIST } from "../data/equipment";
+import { useAdminSession } from "../hooks/useAdminSession";
 
 const ESTADOS = ["Bueno", "Regular", "Malo"];
 
+const SEDES_DISPONIBLES = nombresSedes();
+
 export default function GymEquipmentRegisterPage() {
-  const [isAdmin, setIsAdmin] = useState(false);
+  const sesion = useAdminSession();
   const [form, setForm] = useState({
     fechaRevision: dayjs().format("YYYY-MM-DD"),
     instructor: "",
-    sede: branches[0] || "",
+    sede: SEDES_DISPONIBLES[0] || "",
     elemento: "",
     estado: ESTADOS[0],
     descripcion: "",
@@ -42,15 +46,6 @@ export default function GymEquipmentRegisterPage() {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
 
-  useEffect(() => {
-    const isLoggedIn = localStorage.getItem("adminAuth");
-    if (!isLoggedIn) {
-      window.location.href = "/login";
-    } else {
-      setIsAdmin(true);
-    }
-    // eslint-disable-next-line
-  }, []);
 
   const handleFormChange = (e: any) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -70,7 +65,7 @@ export default function GymEquipmentRegisterPage() {
       setForm({
         fechaRevision: dayjs().format("YYYY-MM-DD"),
         instructor: "",
-        sede: branches[0] || "",
+        sede: SEDES_DISPONIBLES[0] || "",
         elemento: "",
         estado: ESTADOS[0],
         descripcion: "",
@@ -86,7 +81,7 @@ export default function GymEquipmentRegisterPage() {
     }
   };
 
-  if (!isAdmin) return null;
+  if (sesion !== "autorizado") return null;
 
   return (
     <Container maxWidth="sm" sx={{ mt: 5, mb: 5, display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -129,7 +124,7 @@ export default function GymEquipmentRegisterPage() {
         <FormControl fullWidth>
           <InputLabel>Sede</InputLabel>
           <Select name="sede" value={form.sede} label="Sede" onChange={handleFormChange} required>
-            {branches.map((sede) => (
+            {SEDES_DISPONIBLES.map((sede) => (
               <MenuItem key={sede} value={sede}>{sede}</MenuItem>
             ))}
           </Select>
