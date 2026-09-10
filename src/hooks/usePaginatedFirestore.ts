@@ -6,7 +6,6 @@ import {
   orderBy,
   where,
   getDocs,
-  getCountFromServer,
   DocumentData,
 } from 'firebase/firestore';
 import { useState, useEffect } from 'react';
@@ -64,6 +63,12 @@ export function usePaginatedFirestore<T = DocumentData>({
 
   return {
     data: paginatedData,
+    /**
+     * Todos los documentos del rango, sin paginar. El hook ya los trae a
+     * memoria, así que filtrar y exportar desde aquí no cuesta lecturas ni
+     * exige índices compuestos nuevos.
+     */
+    allData,
     loading,
     error,
     totalDocs,

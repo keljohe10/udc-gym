@@ -8,10 +8,8 @@ import {
   Alert,
   Box,
 } from "@mui/material";
-import { collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "../firebase/config";
-import bcrypt from "bcryptjs";
 import { LoadingButton } from "@mui/lab";
+import { CLAVE_PISTA_ADMIN } from "../hooks/useAdminSession";
 
 export default function LoginPage() {
   const [usuario, setUsuario] = useState("");
@@ -24,30 +22,27 @@ export default function LoginPage() {
   const handleLogin = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, "admin"), where("usuario", "==", usuario));
-      const result = await getDocs(q);
+      // La comparación de bcrypt ocurre en el servidor: el hash de la
+      // contraseña ya no viaja al navegador.
+      const respuesta = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usuario, password }),
+      });
+      const datos = await respuesta.json().catch(() => ({}));
 
-      if (!result.empty) {
-        const adminDoc = result.docs[0].data();
-        const passwordValida = await bcrypt.compare(
-          password,
-          adminDoc.password
-        );
-
-        if (passwordValida) {
-          localStorage.setItem("adminAuth", "true");
-          router.push("/history");
-        } else {
-          setErrorMsg("Contraseña incorrecta");
-          setOpen(true);
-        }
-      } else {
-        setErrorMsg("Usuario no encontrado");
-        setOpen(true);
+      if (respuesta.ok) {
+        // Pista de UI. La sesión real es la cookie httpOnly que emite la route.
+        localStorage.setItem(CLAVE_PISTA_ADMIN, "true");
+        router.push("/history");
+        return;
       }
+
+      setErrorMsg(datos.mensaje ?? "Error al iniciar sesión");
+      setOpen(true);
     } catch (error) {
       console.error(error);
-      setErrorMsg("Error al iniciar sesión");
+      setErrorMsg("No pudimos conectar con el servidor. Verifica tu conexión.");
       setOpen(true);
     } finally {
       setLoading(false);

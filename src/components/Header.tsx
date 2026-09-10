@@ -7,11 +7,14 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
+import { CLAVE_PISTA_ADMIN } from "../hooks/useAdminSession";
 
 const navLinks = [
   { label: "Registro de Asistencias", href: "/history" },
+  { label: "Indicadores", href: "/bienestar" },
   { label: "Consulta de Equipamientos", href: "/gym-equipment-list" },
   { label: "Registro de Equipamientos", href: "/gym-equipment" },
+  { label: "Sedes", href: "/sedes" },
 ];
 
 export default function Header() {
@@ -21,16 +24,19 @@ export default function Header() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
+  // Se reevalúa en cada navegación, que es cuando la barra puede quedar
+  // desfasada respecto a la sesión real.
   useEffect(() => {
-    const auth = localStorage.getItem("adminAuth");
-    setIsLoggedIn(!!auth);
-  }, [typeof window !== "undefined" && localStorage.getItem("adminAuth")]);
+    setIsLoggedIn(Boolean(localStorage.getItem(CLAVE_PISTA_ADMIN)));
+  }, [router.asPath]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("adminAuth");
+  const handleLogout = async () => {
+    // La sesión vive en una cookie httpOnly: cerrarla requiere al servidor.
+    await fetch("/api/admin/logout", { method: "POST" }).catch(() => {});
+    localStorage.removeItem(CLAVE_PISTA_ADMIN);
     setIsLoggedIn(false);
-    router.push("/login");
     setDrawerOpen(false);
+    router.push("/login");
   };
 
   const handleDrawerToggle = () => {

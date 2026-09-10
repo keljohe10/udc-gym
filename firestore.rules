@@ -1,0 +1,67 @@
+rules_version = '2';
+
+// No se usa Firebase Auth, así que `request.auth` siempre es null: las reglas
+// solo pueden discriminar por colección, operación y forma del dato. El Admin
+// SDK las ignora por diseño, así que todo lo que pasa por una API route es
+// inmune a ellas — ahí es donde vive la validación real.
+//
+// ORDEN DE DESPLIEGUE: primero el código, luego estas reglas. Al revés se rompe
+// el registro de asistencia y el login para las sesiones ya abiertas.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Credenciales de administrador. El login pasa por /api/admin/login con el
+    // Admin SDK, así que el hash de bcrypt ya no necesita salir del servidor.
+    match /admin/{doc} {
+      allow read, write: if false;
+    }
+
+    // Asistencias. Solo las escribe /api/asistencia tras revalidar el geofence.
+    // La lectura sigue abierta porque el panel usa el SDK cliente.
+    match /history/{doc} {
+      allow read: if true;
+      allow create, update, delete: if false;
+    }
+
+    // Coordenadas y radios. No son secretos: la validación ocurre en servidor.
+    // Se escriben desde /api/admin/sedes.
+    match /sedes/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /config/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Inventario de implementos. La escritura sigue en el cliente; cerrarla
+    // exige migrar antes gym-equipment.tsx y gym-equipment-list.tsx a API.
+    match /gymEquipment/{doc} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Registro público de usuarios. Solo se valida la forma del documento:
+    // sin autenticación no hay manera de validar la identidad.
+    match /users/{doc} {
+      allow read: if true;
+      allow create: if usuarioValido(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    function usuarioValido(d) {
+      return d.keys().hasOnly(['name','id','email','userType','department','studentCode','program','createdAt'])
+        && d.keys().hasAll(['name','id','email','userType','createdAt'])
+        && d.name is string  && d.name.size() > 2 && d.name.size() < 120
+        && d.id is string    && d.id.size() > 3   && d.id.size() < 20
+        && d.email is string && d.email.size() < 120
+        && d.userType in ['estudiante','docente','administrativo']
+        && d.createdAt == request.time;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

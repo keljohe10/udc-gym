@@ -32,13 +32,17 @@ import {
   query,
   orderBy,
 } from "firebase/firestore";
-import branches, { EQUIPMENT_LIST } from "../data/branch";
+import { nombresSedes } from "../data/sedes";
+import { EQUIPMENT_LIST } from "../data/equipment";
+import { useAdminSession } from "../hooks/useAdminSession";
 import * as XLSX from "xlsx";
 
 const ESTADOS = ["Bueno", "Regular", "Malo"];
 
+const SEDES_DISPONIBLES = nombresSedes();
+
 export default function GymEquipmentListPage() {
-  const [isAdmin, setIsAdmin] = useState(false);
+  const sesion = useAdminSession();
   const [equipos, setEquipos] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
@@ -50,15 +54,9 @@ export default function GymEquipmentListPage() {
   const [elementosUnicos, setElementosUnicos] = useState<string[]>([]);
 
   useEffect(() => {
-    const isLoggedIn = localStorage.getItem("adminAuth");
-    if (!isLoggedIn) {
-      window.location.href = "/login";
-    } else {
-      setIsAdmin(true);
-      fetchEquipos();
-    }
+    if (sesion === "autorizado") fetchEquipos();
     // eslint-disable-next-line
-  }, []);
+  }, [sesion]);
 
   const fetchEquipos = async () => {
     setLoading(true);
@@ -133,7 +131,7 @@ export default function GymEquipmentListPage() {
     XLSX.writeFile(workbook, `equipos-gimnasio-${dayjs().format("YYYY-MM-DD")}.xlsx`);
   };
 
-  if (!isAdmin) return null;
+  if (sesion !== "autorizado") return null;
 
   return (
     <Container sx={{ mt: 5, mb: 5 }}>
@@ -149,7 +147,7 @@ export default function GymEquipmentListPage() {
             onChange={(e) => setFilters((f) => ({ ...f, sede: e.target.value }))}
           >
             <MenuItem value="">Todas</MenuItem>
-            {branches.map((sede) => (
+            {SEDES_DISPONIBLES.map((sede) => (
               <MenuItem key={sede} value={sede}>{sede}</MenuItem>
             ))}
           </Select>
