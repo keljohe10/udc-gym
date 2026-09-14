@@ -3,7 +3,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { FieldValue } from "firebase-admin/firestore";
 import { obtenerDbAdmin } from "../../lib/firebaseAdmin";
 import { cargarSedes } from "../../lib/sedes.server";
-import { ventanaDelDiaColombia } from "../../lib/fechas";
+import { partesColombia } from "../../lib/fechas";
 import {
   PRECISION_MAXIMA_ABSOLUTA_METROS,
   formatearDistancia,
@@ -21,6 +21,17 @@ interface Cuerpo {
 
 const esNumeroFinito = (v: unknown): v is number =>
   typeof v === "number" && Number.isFinite(v);
+
+/**
+ * Firestore responde ALREADY_EXISTS (gRPC 6) cuando `create()` cae sobre un
+ * documento que ya existe. Se comprueba también el texto porque el código no
+ * viaja en todos los caminos de error del SDK.
+ */
+const esConflicto = (error: unknown): boolean =>
+  typeof error === "object" &&
+  error !== null &&
+  ((error as { code?: unknown }).code === 6 ||
+    /already exists/i.test(String((error as { message?: unknown }).message ?? "")));
 
 export default async function handler(
   req: NextApiRequest,
@@ -137,23 +148,28 @@ export default async function handler(
     }
     const usuario = snapUsuario.docs[0].data();
 
-    // Ventana anclada a la hora de Colombia: esta route corre en UTC.
-    const { inicio, fin } = ventanaDelDiaColombia();
-    const yaRegistrado = await db
+    // Un registro por usuario y día, sin importar la sede.
+    //
+    // El dedupe filtraba además por `branch`, lo que daba un cupo por sede. Los
+    // perímetros de Cartagena se solapan a propósito — San Pablo y Zaragocilla
+    // están a 77 m, por debajo de lo que el GPS puede separar — así que quien
+    // está en uno cae legítimamente dentro del otro y podía registrar en ambos
+    // con el geofence funcionando y aprobando las dos veces. Separarlos no es
+    // trabajo del geofence: el límite es por persona y día.
+    //
+    // El id del documento es determinista y `create()` falla si ya existe, así
+    // que no queda ventana entre comprobar y escribir: dos peticiones
+    // simultáneas (doble toque, reintento de red, dos pestañas) ya no pueden
+    // colarse las dos como sí ocurría con `get()` + `add()`.
+    const dia = partesColombia(new Date()).dia;
+    // El documento de identidad es texto libre. `encodeURIComponent` es
+    // inyectivo —dos documentos distintos nunca colisionan— y escapa la barra,
+    // único carácter que Firestore prohíbe dentro de un id.
+    const refRegistro = db
       .collection("history")
-      .where("userId", "==", userId)
-      .where("branch", "==", sede.nombre)
-      .where("createdAt", ">=", inicio)
-      .where("createdAt", "<=", fin)
-      .limit(1)
-      .get();
-    if (!yaRegistrado.empty) {
-      return res
-        .status(409)
-        .json({ mensaje: "Ya has registrado tu asistencia hoy en esta sede." });
-    }
+      .doc(`${encodeURIComponent(userId)}_${dia}`);
 
-    await db.collection("history").add({
+    const registro = {
       userId,
       name: usuario.name,
       userType: usuario.userType,
@@ -179,7 +195,23 @@ export default async function handler(
       ...(usuario.department && { department: usuario.department }),
       ...(usuario.studentCode && { studentCode: usuario.studentCode }),
       ...(usuario.program && { program: usuario.program }),
-    });
+    };
+
+    try {
+      await refRegistro.create(registro);
+    } catch (error) {
+      if (!esConflicto(error)) throw error;
+      // La lectura solo se paga en el camino del duplicado, y sirve para nombrar
+      // la sede del registro que ya existe: un "ya registraste hoy" a secas
+      // confunde a quien creía estar marcando en una sede distinta.
+      const previo = (await refRegistro.get()).data();
+      return res.status(409).json({
+        mensaje:
+          typeof previo?.branch === "string"
+            ? `Ya registraste tu asistencia hoy en ${previo.branch}.`
+            : "Ya registraste tu asistencia hoy.",
+      });
+    }
 
     return res.status(201).json({ mensaje: "Asistencia registrada!" });
   } catch (error) {
